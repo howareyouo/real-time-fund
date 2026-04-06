@@ -34,7 +34,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { DragIcon, ExitIcon, SettingsIcon, StarIcon, TrashIcon, ResetIcon } from './Icons';
+import { DragIcon, SettingsIcon, StarIcon, TrashIcon, ResetIcon } from './Icons';
 import { fetchRelatedSectors, fetchRelatedSectorLiveQuote } from '@/app/api/fund';
 
 const NON_FROZEN_COLUMN_IDS = [
@@ -130,7 +130,6 @@ function SortableRow({ row, children, isTableDragging, disabled }) {
  * @param {string} [props.currentTab] - 当前分组
  * @param {Set<string>} [props.favorites] - 自选集合
  * @param {(row: any) => void} [props.onToggleFavorite] - 添加/取消自选
- * @param {(row: any) => void} [props.onRemoveFromGroup] - 从当前分组移除
  * @param {(row: any, meta: { hasHolding: boolean }) => void} [props.onHoldingAmountClick] - 点击持仓金额
  * @param {boolean} [props.refreshing] - 是否处于刷新状态（控制删除按钮禁用态）
  * @param {(row: any) => Object} [props.getFundCardProps] - 给定行返回 FundCard 的 props；传入后点击基金名称将用弹框展示卡片详情
@@ -146,7 +145,6 @@ export default function PcFundTable({
   currentTab,
   favorites = new Set(),
   onToggleFavorite,
-  onRemoveFromGroup,
   onHoldingAmountClick,
   onHoldingProfitClick, // 保留以兼容调用方，表格内已不再使用点击切换
   refreshing = false,
@@ -381,7 +379,6 @@ export default function PcFundTable({
   };
   const onRemoveFundRef = useRef(onRemoveFund);
   const onToggleFavoriteRef = useRef(onToggleFavorite);
-  const onRemoveFromGroupRef = useRef(onRemoveFromGroup);
   const onHoldingAmountClickRef = useRef(onHoldingAmountClick);
 
   useEffect(() => {
@@ -394,12 +391,10 @@ export default function PcFundTable({
   useEffect(() => {
     onRemoveFundRef.current = onRemoveFund;
     onToggleFavoriteRef.current = onToggleFavorite;
-    onRemoveFromGroupRef.current = onRemoveFromGroup;
     onHoldingAmountClickRef.current = onHoldingAmountClick;
   }, [
     onRemoveFund,
     onToggleFavorite,
-    onRemoveFromGroup,
     onHoldingAmountClick,
   ]);
 
@@ -607,19 +602,7 @@ export default function PcFundTable({
             <DragIcon width="16" height="16" />
           </button>
         )}
-        {isGroupTab ? (
-          <button
-            className="icon-button fav-button"
-            onClick={(e) => {
-              e.stopPropagation?.();
-              onRemoveFromGroupRef.current?.(original);
-            }}
-            title="从小分组移除"
-            style={{ backgroundColor: 'transparent'}}
-          >
-            <ExitIcon width="18" height="18" style={{ transform: 'rotate(180deg)' }} />
-          </button>
-        ) : (
+        {!isGroupTab ? (
           <button
             className={`icon-button fav-button ${isFavorites ? 'active' : ''}`}
             onClick={(e) => {
@@ -630,7 +613,7 @@ export default function PcFundTable({
           >
             <StarIcon width="18" height="18" filled={isFavorites} />
           </button>
-        )}
+        ) : null}
         <div
           className="title-text"
           role={onOpenCardDialog ? 'button' : undefined}

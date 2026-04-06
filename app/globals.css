@@ -1634,6 +1634,19 @@ input[type="number"] {
     overflow: hidden;
   }
 
+  /* 移动端表格行：长按进批量/排序时尽量避免系统文字选择与 iOS 放大镜/呼出菜单（兼容 WebKit / Chromium） */
+  .mobile-fund-table .table-row-wrapper,
+  .mobile-fund-table .table-row-wrapper *,
+  .mobile-fund-table .table-row,
+  .mobile-fund-table .table-row * {
+    -webkit-user-select: none;
+    -webkit-user-drag: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+  }
+
   .mobile-fund-table .table-row {
     grid-template-areas: unset;
     gap: 12px;
@@ -1641,10 +1654,6 @@ input[type="number"] {
     padding-bottom: 0 !important;
     padding-left: 0 !important;
     border-bottom: 1px solid rgba(0, 0, 0, 0.08);
-    /* 长按拖拽时禁止触发文字选择 */
-    user-select: none;
-    -webkit-user-select: none;
-    -webkit-touch-callout: none;
   }
   .mobile-fund-table .table-header-row {
     border-bottom: 1px solid rgba(0, 0, 0, 0.08);

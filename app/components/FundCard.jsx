@@ -14,7 +14,6 @@ import FundIntradayChart from './FundIntradayChart';
 import FundDailyEarnings from './FundDailyEarnings';
 import {
   ChevronIcon,
-  ExitIcon,
   SettingsIcon,
   StarIcon,
   SwitchIcon,
@@ -66,7 +65,6 @@ export default function FundCard({
   isTradingDay,
   refreshing,
   getHoldingProfit,
-  onRemoveFromGroup,
   onToggleFavorite,
   onRemoveFund,
   onHoldingClick,
@@ -108,6 +106,8 @@ export default function FundCard({
     return dailyEarningsSeries;
   }, [dailyEarningsSeries, hasHoldingShare]);
 
+  const showFavoriteButton = currentTab === 'all' || currentTab === 'fav';
+
   const style = layoutMode === 'drawer' ? {
     border: 'none',
     boxShadow: 'none',
@@ -127,19 +127,7 @@ export default function FundCard({
     >
       <div className="row" style={{ marginBottom: 10 }}>
         <div className="title">
-          {currentTab !== 'all' && currentTab !== 'fav' ? (
-            <button
-              className="icon-button fav-button"
-              onClick={(e) => {
-                e.stopPropagation();
-                onRemoveFromGroup?.(f.code);
-              }}
-              style={{backgroundColor: 'transparent'}}
-              title="从当前分组移除"
-            >
-              <ExitIcon width="18" height="18" style={{ transform: 'rotate(180deg)' }} />
-            </button>
-          ) : (
+          {showFavoriteButton ? (
             <button
               className={`icon-button fav-button ${favorites?.has(f.code) ? 'active' : ''}`}
               onClick={(e) => {
@@ -150,7 +138,7 @@ export default function FundCard({
             >
               <StarIcon width="18" height="18" filled={favorites?.has(f.code)} />
             </button>
-          )}
+          ) : null}
           <div className="title-text">
             <span
               className="name-text"

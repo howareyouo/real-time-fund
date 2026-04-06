@@ -222,6 +222,37 @@
 - 买入/卖出操作时更新
 - 导入/导出配置时包含
 
+**说明（与分组关系）**: 「全部」「自选」Tab 仅使用本键；自定义分组 Tab 使用 `groupHoldings` 中对应分组的持仓子账本。
+
+---
+
+### 9.1 groupHoldings
+
+**类型**: `Object`
+**默认值**: `{}`
+**说明**: 按自定义分组 ID 存储独立持仓（份额、成本等），与全局 `holdings` 分离
+**云端同步**: 是
+
+**数据结构**:
+```javascript
+{
+  "group_1730000000000": {
+    "110022": {
+      share: number,
+      cost: number,
+      firstPurchaseDate?: string  // 与全局持仓字段一致的可选扩展
+    }
+  }
+}
+```
+
+**历史兼容**: 升级后首次加载时，若某分组内某基金代码在全局 `holdings` 中有有效持仓且该分组槽位为空，会**深拷贝**一份到该分组；同一基金在多个分组中会出现多份独立数据。
+
+**使用场景**:
+- 自定义分组 Tab 下的持仓金额、收益、排序
+- 分组内编辑持仓、买卖、定投、待定成交、交易记录（带 `groupId`）
+- 导入/导出与云端同步
+
 ---
 
 ### 10. pendingTrades
@@ -247,7 +278,8 @@
     date: string,        // 交易日期
     isAfter3pm: boolean, // 是否下午3点后
     isDca: boolean,      // 是否为定投交易
-    timestamp: number    // 时间戳
+    timestamp: number,   // 时间戳
+    groupId?: string     // 可选；存在时表示作用于该分组的 groupHoldings；缺省表示全局 holdings
   }
 ]
 ```
@@ -461,7 +493,8 @@ groupId   // 分组ID，如 'group_xxx'
       isAfter3pm: boolean,   // 是否下午3点后
       isDca: boolean,        // 是否为定投交易
       isHistoryOnly: boolean, // 是否仅历史记录（不参与持仓计算）
-      timestamp: number      // 时间戳
+      timestamp: number,      // 时间戳
+      groupId?: string        // 可选；存在时表示该笔记录属于某分组子账本；缺省表示全局
     }
   ],
   "110022": [
@@ -480,33 +513,36 @@ groupId   // 分组ID，如 'group_xxx'
 ### 20. dcaPlans (定投计划)
 
 **类型**: `Object`
-**默认值**: `{}`
-**说明**: 存储用户的定投计划配置
+**默认值**: `{ "__global__": {} }`（迁移后）
+**说明**: 存储用户的定投计划配置；分「全局」与「各自定义分组」两套计划
 **云端同步**: 是
 
-**数据结构**:
+**数据结构（当前版本）**:
 ```javascript
 {
-  "000001": {    // 按基金代码索引
-    amount: number,     // 每次定投金额
-    feeRate: number,    // 手续费率
-    cycle: string,      // 定投周期 'daily' | 'weekly' | 'biweekly' | 'monthly'
-    firstDate: string,  // 首次定投日期
-    enabled: boolean,   // 是否启用
-    weeklyDay: number,  // 每周定投日（1-7，周一为1）
-    monthlyDay: number, // 每月定投日（1-31）
-    lastDate: string    // 最后定投日期
+  "__global__": {
+    "000001": {
+      amount: number,
+      feeRate: number,
+      cycle: string,
+      firstDate: string,
+      enabled: boolean,
+      weeklyDay: number,
+      monthlyDay: number,
+      lastDate: string
+    }
   },
-  "110022": {
-    // ...
+  "group_1730000000000": {
+    "110022": { /* 同结构，仅作用于该分组 */ }
   }
 }
 ```
 
+**旧版兼容**: 若本地仍为「基金代码 → 计划」的扁平对象（无 `__global__` 键），加载时会自动迁移为 `{ "__global__": 原对象 }`。
+
 **使用场景**:
-- 自动定投执行
-- 定投计划管理
-- 买入操作时设置
+- 自动定投执行（按 scope 生成带 `groupId` 的 pending）
+- 定投计划管理（在「全部/自选」下编辑全局计划，在分组 Tab 下编辑该分组计划）
 
 ---
 
@@ -577,6 +613,7 @@ groupId   // 分组ID，如 'group_xxx'
 - collapsedEarnings
 - refreshMs
 - holdings
+- groupHoldings
 - pendingTrades
 - transactions
 - dcaPlans
@@ -614,9 +651,10 @@ groupId   // 分组ID，如 'group_xxx'
   collapsedEarnings: [],
   refreshMs: 30000,
   holdings: {},
+  groupHoldings: {},
   pendingTrades: [],
   transactions: {},
-  dcaPlans: {},
+  dcaPlans: { __global__: {} },
   customSettings: {},
   fundDailyEarnings: {},
   exportedAt: '2024-01-15T10:30:00.000Z'
@@ -625,7 +663,8 @@ groupId   // 分组ID，如 'group_xxx'
 
 **导入逻辑**:
 - 合并基金列表（去重）
-- 合并自选、分组等配置
+- 合并自选、分组、`holdings`、`groupHoldings`、扁平或分桶的 `dcaPlans` 等配置
+- `pendingTrades` 合并键包含 `groupId`，避免不同分组下同基金冲突
 - 保留现有数据，避免覆盖
 
 ---
@@ -653,9 +692,10 @@ const dedupeByCode = (list) => {
 在收集数据上传云端时，会进行数据验证和清理：
 
 1. 清理无效的持仓数据（基金不存在的持仓）
-2. 清理无效的自选、分组、收起状态
-3. 清理无效的交易记录和定投计划
-4. 确保数据类型正确
+2. 清理 `groupHoldings` 中已删除分组、无效基金代码的条目
+3. 清理无效的自选、分组、收起状态
+4. 清理无效的交易记录和定投计划（含分桶 `dcaPlans`）
+5. 确保数据类型正确
 
 ---
 
@@ -717,6 +757,7 @@ const storageHelper = {
 
 ## 更新日志
 
+- **2026-04-05（分组独立持仓）**: 新增 `groupHoldings`；`pendingTrades` / `transactions` 支持可选 `groupId`；`dcaPlans` 改为分桶结构（`__global__` + 分组 ID）；同步键与导入导出格式已更新；说明分组持仓从历史全局 `holdings` 的幂等深拷贝迁移规则
 - **2026-04-05**: 全面更新文档，新增 `collapsedEarnings`、`fundDailyEarnings` 键；更新 `customSettings`（新增 `localSortDisplayMode`、`showMarketIndexPc`、`showMarketIndexMobile`）；更新 `dcaPlans`（新增 `weeklyDay`、`monthlyDay`、`lastDate`）；更新 `transactions`（新增 `isDca`、`isHistoryOnly`）；更新 `pendingTrades`（新增 `isDca`）；更新公告版本号至 v20；更新云端同步键列表
 - **2026-03-18**: 全面更新文档，补充 transactions、dcaPlans、fundValuationTimeseries、customSettings 等键的详细说明，修正云端同步键列表
 - **2026-02-19**: 初始文档创建

@@ -98,6 +98,92 @@ const nowInTz = () => dayjs().tz(TZ);
 const toTz = (input) => (input ? dayjs.tz(input, TZ) : nowInTz());
 const formatDate = (input) => toTz(input).format('YYYY-MM-DD');
 
+/** 定投计划分桶：全局与其它自定义分组 */
+const DCA_SCOPE_GLOBAL = '__global__';
+
+function cloneHoldingDeep(src) {
+  if (!isPlainObject(src)) return null;
+  try {
+    return typeof structuredClone === 'function' ? structuredClone(src) : JSON.parse(JSON.stringify(src));
+  } catch {
+    return { ...src };
+  }
+}
+
+/** 规范化单条持仓（与 collectLocalPayload 清洗逻辑对齐） */
+function normalizeHoldingEntryForSeed(value) {
+  if (!isPlainObject(value)) return null;
+  const parsedShare = isNumber(value.share)
+    ? value.share
+    : isString(value.share)
+      ? Number(value.share)
+      : NaN;
+  const parsedCost = isNumber(value.cost)
+    ? value.cost
+    : isString(value.cost)
+      ? Number(value.cost)
+      : NaN;
+  const nextShare = Number.isFinite(parsedShare) ? parsedShare : null;
+  const nextCost = Number.isFinite(parsedCost) ? parsedCost : null;
+  if (nextShare === null && nextCost === null) return null;
+  return { ...value, share: nextShare, cost: nextCost };
+}
+
+/**
+ * 幂等：按分组用全局持仓填空槽；剔除已删除分组的 key；多分组各得深拷贝。
+ */
+function seedGroupHoldingsFromGlobal(globalHoldings, groups, prevGroupHoldings) {
+  const prev = isPlainObject(prevGroupHoldings) ? prevGroupHoldings : {};
+  const groupIdSet = new Set(groups.map((g) => g?.id).filter(Boolean));
+  const next = {};
+  for (const id of groupIdSet) {
+    next[id] = { ...(isPlainObject(prev[id]) ? prev[id] : {}) };
+  }
+  let changed = Object.keys(prev).some((id) => !groupIdSet.has(id));
+  if (!changed && Object.keys(next).length !== Object.keys(prev).filter((id) => groupIdSet.has(id)).length) {
+    changed = true;
+  }
+  if (isPlainObject(globalHoldings)) {
+    for (const g of groups) {
+      if (!g?.id || !groupIdSet.has(g.id)) continue;
+      const bucket = next[g.id];
+      for (const code of g.codes || []) {
+        if (!code || bucket[code] !== undefined) continue;
+        const norm = normalizeHoldingEntryForSeed(globalHoldings[code]);
+        if (!norm) continue;
+        const cloned = cloneHoldingDeep(norm);
+        if (cloned) {
+          bucket[code] = cloned;
+          changed = true;
+        }
+      }
+    }
+  }
+  if (!changed) {
+    const prevKeys = Object.keys(prev).sort();
+    const nextKeys = Object.keys(next).sort();
+    if (prevKeys.join(',') !== nextKeys.join(',')) changed = true;
+    else {
+      for (const id of nextKeys) {
+        if (JSON.stringify(next[id]) !== JSON.stringify(prev[id])) {
+          changed = true;
+          break;
+        }
+      }
+    }
+  }
+  return { next, changed };
+}
+
+/** 旧版扁平 dcaPlans（code -> plan）→ { __global__: { ... } } */
+function migrateDcaPlansToScoped(raw) {
+  if (!isPlainObject(raw)) return { [DCA_SCOPE_GLOBAL]: {} };
+  if (raw[DCA_SCOPE_GLOBAL] !== undefined && isPlainObject(raw[DCA_SCOPE_GLOBAL])) {
+    return raw;
+  }
+  return { [DCA_SCOPE_GLOBAL]: { ...raw } };
+}
+
 function ScanButton({ onClick, disabled }) {
   return (
     <button
@@ -441,21 +527,25 @@ export default function HomePage() {
   const [clearConfirm, setClearConfirm] = useState(null); // { fund }
   const [donateOpen, setDonateOpen] = useState(false);
   const [holdings, setHoldings] = useState({}); // { [code]: { share: number, cost: number } }
+  /** 自定义分组独立持仓：groupId -> code -> holding */
+  const [groupHoldings, setGroupHoldings] = useState({});
   const [pendingTrades, setPendingTrades] = useState([]); // [{ id, fundCode, share, date, ... }]
   const [transactions, setTransactions] = useState({}); // { [code]: [{ id, type, amount, share, price, date, timestamp }] }
-  const [dcaPlans, setDcaPlans] = useState({}); // { [code]: { amount, feeRate, cycle, firstDate, enabled } }
+  const [dcaPlans, setDcaPlans] = useState({}); // scoped: { __global__|groupId: { [code]: plan } }
   const [historyModal, setHistoryModal] = useState({ open: false, fund: null });
   const [addHistoryModal, setAddHistoryModal] = useState({ open: false, fund: null });
   const [percentModes, setPercentModes] = useState({}); // { [code]: boolean }
   const [todayPercentModes, setTodayPercentModes] = useState({}); // { [code]: boolean }
 
   const holdingsRef = useRef(holdings);
+  const groupHoldingsRef = useRef(groupHoldings);
   const pendingTradesRef = useRef(pendingTrades);
 
   useEffect(() => {
     holdingsRef.current = holdings;
+    groupHoldingsRef.current = groupHoldings;
     pendingTradesRef.current = pendingTrades;
-  }, [holdings, pendingTrades]);
+  }, [holdings, groupHoldings, pendingTrades]);
 
   const [isTradingDay, setIsTradingDay] = useState(true); // 默认为交易日，通过接口校正
   const tabsRef = useRef(null);
@@ -666,6 +756,32 @@ export default function HomePage() {
     };
   }, [isTradingDay, todayStr]);
 
+  const activeGroupId =
+    currentTab !== 'all' && currentTab !== 'fav' && groups.some((g) => g.id === currentTab)
+      ? currentTab
+      : null;
+
+  const holdingsForTab = useMemo(() => {
+    if (!activeGroupId) return holdings;
+    return groupHoldings[activeGroupId] || {};
+  }, [holdings, groupHoldings, activeGroupId]);
+
+  const dcaPlansForTab = useMemo(() => {
+    const scoped = migrateDcaPlansToScoped(dcaPlans);
+    const bucket = scoped[activeGroupId || DCA_SCOPE_GLOBAL];
+    return isPlainObject(bucket) ? bucket : {};
+  }, [dcaPlans, activeGroupId]);
+
+  const transactionsForTab = useMemo(() => {
+    if (!activeGroupId) return transactions;
+    const out = {};
+    Object.entries(transactions || {}).forEach(([code, list]) => {
+      if (!Array.isArray(list)) return;
+      const filtered = list.filter((t) => t.groupId === activeGroupId);
+      if (filtered.length) out[code] = filtered;
+    });
+    return out;
+  }, [transactions, activeGroupId]);
 
   // 过滤和排序后的基金列表
   const displayFunds = useMemo(
@@ -722,8 +838,8 @@ export default function HomePage() {
           return sortOrder === 'asc' ? valA - valB : valB - valA;
         }
         if (sortBy === 'holdingAmount') {
-          const pa = getHoldingProfit(a, holdings[a.code]);
-          const pb = getHoldingProfit(b, holdings[b.code]);
+          const pa = getHoldingProfit(a, holdingsForTab[a.code]);
+          const pb = getHoldingProfit(b, holdingsForTab[b.code]);
           const amountA = pa?.amount ?? Number.NEGATIVE_INFINITY;
           const amountB = pb?.amount ?? Number.NEGATIVE_INFINITY;
           return sortOrder === 'asc' ? amountA - amountB : amountB - amountA;
@@ -742,8 +858,8 @@ export default function HomePage() {
           return sortOrder === 'asc' ? valA - valB : valB - valA;
         }
         if (sortBy === 'todayProfit') {
-          const pa = getHoldingProfit(a, holdings[a.code]);
-          const pb = getHoldingProfit(b, holdings[b.code]);
+          const pa = getHoldingProfit(a, holdingsForTab[a.code]);
+          const pb = getHoldingProfit(b, holdingsForTab[b.code]);
           const valA = pa?.profitToday;
           const valB = pb?.profitToday;
           const hasA = valA != null && Number.isFinite(valA);
@@ -757,8 +873,8 @@ export default function HomePage() {
           return sortOrder === 'asc' ? valA - valB : valB - valA;
         }
         if (sortBy === 'holding') {
-          const pa = getHoldingProfit(a, holdings[a.code]);
-          const pb = getHoldingProfit(b, holdings[b.code]);
+          const pa = getHoldingProfit(a, holdingsForTab[a.code]);
+          const pb = getHoldingProfit(b, holdingsForTab[b.code]);
           const valA = pa?.profitTotal ?? Number.NEGATIVE_INFINITY;
           const valB = pb?.profitTotal ?? Number.NEGATIVE_INFINITY;
           return sortOrder === 'asc' ? valA - valB : valB - valA;
@@ -769,7 +885,7 @@ export default function HomePage() {
         return 0;
       });
     },
-    [funds, currentTab, favorites, groups, sortBy, sortOrder, holdings, getHoldingProfit],
+    [funds, currentTab, favorites, groups, sortBy, sortOrder, holdingsForTab, getHoldingProfit],
   );
 
   // PC 端表格数据（用于 PcFundTable）
@@ -809,7 +925,7 @@ export default function HomePage() {
         const estimateTime = f.noValuation ? (f.jzrq || '-') : (f.gztime || f.time || '-');
         const hasTodayEstimate = !f.noValuation && isString(f.gztime) && f.gztime.startsWith(todayStr);
 
-        const holding = holdings[f.code];
+        const holding = holdingsForTab[f.code];
         const profit = getHoldingProfit(f, holding);
         const amount = profit ? profit.amount : null;
         const holdingAmount =
@@ -874,7 +990,7 @@ export default function HomePage() {
           code: f.code,
           fundName: f.name,
           isUpdated: f.jzrq === todayStr,
-          hasDca: dcaPlans[f.code]?.enabled === true,
+          hasDca: dcaPlansForTab[f.code]?.enabled === true,
           latestNav,
           latestNavDate: yesterdayDate,
           estimateNav,
@@ -902,7 +1018,7 @@ export default function HomePage() {
           holdingProfitValue,
         };
       }),
-    [displayFunds, holdings, isTradingDay, todayStr, getHoldingProfit, dcaPlans],
+    [displayFunds, holdingsForTab, isTradingDay, todayStr, getHoldingProfit, dcaPlansForTab],
   );
 
   // 自动滚动选中 Tab 到可视区域
@@ -929,16 +1045,35 @@ export default function HomePage() {
   const [canRight, setCanRight] = useState(false);
 
   const handleSaveHolding = (code, data) => {
-    setHoldings(prev => {
-      const next = { ...prev };
-      if (data.share === null && data.cost === null) {
-        delete next[code];
-      } else {
-        next[code] = data;
-      }
-      storageHelper.setItem('holdings', JSON.stringify(next));
-      return next;
-    });
+    const gid =
+      currentTab !== 'all' && currentTab !== 'fav' && groups.some((g) => g.id === currentTab)
+        ? currentTab
+        : null;
+    if (!gid) {
+      setHoldings((prev) => {
+        const next = { ...prev };
+        if (data.share === null && data.cost === null) {
+          delete next[code];
+        } else {
+          next[code] = data;
+        }
+        storageHelper.setItem('holdings', JSON.stringify(next));
+        return next;
+      });
+    } else {
+      setGroupHoldings((prev) => {
+        const next = { ...prev };
+        const bucket = { ...(next[gid] || {}) };
+        if (data.share === null && data.cost === null) {
+          delete bucket[code];
+        } else {
+          bucket[code] = data;
+        }
+        next[gid] = bucket;
+        storageHelper.setItem('groupHoldings', JSON.stringify(next));
+        return next;
+      });
+    }
     setHoldingModal({ open: false, fund: null });
   };
 
@@ -963,17 +1098,48 @@ export default function HomePage() {
   const handleClearConfirm = () => {
     if (clearConfirm?.fund) {
       const code = clearConfirm.fund.code;
-      handleSaveHolding(code, { share: null, cost: null });
+      const gid =
+        currentTab !== 'all' && currentTab !== 'fav' && groups.some((g) => g.id === currentTab)
+          ? currentTab
+          : null;
+      if (!gid) {
+        setHoldings((prev) => {
+          const next = { ...prev };
+          delete next[code];
+          storageHelper.setItem('holdings', JSON.stringify(next));
+          return next;
+        });
+      } else {
+        setGroupHoldings((prev) => {
+          const next = { ...prev };
+          if (next[gid]) {
+            const bucket = { ...next[gid] };
+            delete bucket[code];
+            next[gid] = bucket;
+          }
+          storageHelper.setItem('groupHoldings', JSON.stringify(next));
+          return next;
+        });
+      }
 
-      setTransactions(prev => {
+      setTransactions((prev) => {
         const next = { ...(prev || {}) };
-        delete next[code];
+        const list = next[code] || [];
+        const filtered = list.filter((t) => {
+          if (!gid) return t?.groupId;
+          return t?.groupId !== gid;
+        });
+        if (filtered.length) next[code] = filtered;
+        else delete next[code];
         storageHelper.setItem('transactions', JSON.stringify(next));
         return next;
       });
 
-      setPendingTrades(prev => {
-        const next = prev.filter(trade => trade.fundCode !== code);
+      setPendingTrades((prev) => {
+        const next = prev.filter((trade) => {
+          if (trade.fundCode !== code) return true;
+          return gid ? trade.groupId !== gid : !trade.groupId;
+        });
         storageHelper.setItem('pendingTrades', JSON.stringify(next));
         return next;
       });
@@ -987,10 +1153,34 @@ export default function HomePage() {
 
     let stateChanged = false;
     let tempHoldings = { ...holdingsRef.current };
+    let tempGroupHoldings;
+    try {
+      tempGroupHoldings = JSON.parse(JSON.stringify(groupHoldingsRef.current || {}));
+    } catch {
+      tempGroupHoldings = { ...(groupHoldingsRef.current || {}) };
+    }
     const processedIds = new Set();
     const newTransactions = [];
 
+    const readCurrent = (fundCode, tradeGid) => {
+      if (!tradeGid) {
+        return tempHoldings[fundCode] || { share: 0, cost: 0 };
+      }
+      if (!tempGroupHoldings[tradeGid]) tempGroupHoldings[tradeGid] = {};
+      return tempGroupHoldings[tradeGid][fundCode] || { share: 0, cost: 0 };
+    };
+
+    const writeCurrent = (fundCode, tradeGid, share, cost) => {
+      if (!tradeGid) {
+        tempHoldings[fundCode] = { share, cost };
+      } else {
+        if (!tempGroupHoldings[tradeGid]) tempGroupHoldings[tradeGid] = {};
+        tempGroupHoldings[tradeGid][fundCode] = { share, cost };
+      }
+    };
+
     for (const trade of currentPending) {
+      const tradeGid = trade.groupId || null;
       let queryDate = trade.date;
       if (trade.isAfter3pm) {
           queryDate = toTz(trade.date).add(1, 'day').format('YYYY-MM-DD');
@@ -1001,7 +1191,7 @@ export default function HomePage() {
 
       if (result && result.value > 0) {
         // 成功获取，执行交易
-        const current = tempHoldings[trade.fundCode] || { share: 0, cost: 0 };
+        const current = readCurrent(trade.fundCode, tradeGid);
 
         let newShare, newCost;
         let tradeShare = 0;
@@ -1025,7 +1215,7 @@ export default function HomePage() {
              tradeAmount = trade.share * result.value;
         }
 
-        tempHoldings[trade.fundCode] = { share: newShare, cost: newCost };
+        writeCurrent(trade.fundCode, tradeGid, newShare, newCost);
         stateChanged = true;
         processedIds.add(trade.id);
 
@@ -1040,7 +1230,8 @@ export default function HomePage() {
             date: result.date, // 使用获取到净值的日期
             isAfter3pm: trade.isAfter3pm,
             isDca: !!trade.isDca,
-            timestamp: Date.now()
+            timestamp: Date.now(),
+            ...(tradeGid ? { groupId: tradeGid } : {}),
         });
       }
     }
@@ -1048,6 +1239,8 @@ export default function HomePage() {
     if (stateChanged) {
       setHoldings(tempHoldings);
       storageHelper.setItem('holdings', JSON.stringify(tempHoldings));
+      setGroupHoldings(tempGroupHoldings);
+      storageHelper.setItem('groupHoldings', JSON.stringify(tempGroupHoldings));
 
       setPendingTrades(prev => {
           const next = prev.filter(t => !processedIds.has(t.id));
@@ -1061,7 +1254,19 @@ export default function HomePage() {
               const current = nextState[tx.fundCode] || [];
               // 避免重复添加 (虽然 id 应该唯一)
               if (!current.some(t => t.id === tx.id)) {
-                  nextState[tx.fundCode] = [tx, ...current].sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+                  const row = {
+                    id: tx.id,
+                    type: tx.type,
+                    share: tx.share,
+                    amount: tx.amount,
+                    price: tx.price,
+                    date: tx.date,
+                    isAfter3pm: tx.isAfter3pm,
+                    isDca: tx.isDca,
+                    timestamp: tx.timestamp,
+                  };
+                  if (tx.groupId) row.groupId = tx.groupId;
+                  nextState[tx.fundCode] = [row, ...current].sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
               }
           });
           storageHelper.setItem('transactions', JSON.stringify(nextState));
@@ -1075,7 +1280,12 @@ export default function HomePage() {
   const handleDeleteTransaction = (fundCode, transactionId) => {
     setTransactions(prev => {
       const current = prev[fundCode] || [];
-      const next = current.filter(t => t.id !== transactionId);
+      const gid = activeGroupId;
+      const next = current.filter((t) => {
+        if (t.id !== transactionId) return true;
+        const inScope = !gid ? !t.groupId : t.groupId === gid;
+        return !inScope;
+      });
       const nextState = { ...prev, [fundCode]: next };
       storageHelper.setItem('transactions', JSON.stringify(nextState));
       return nextState;
@@ -1098,8 +1308,9 @@ export default function HomePage() {
         isAfter3pm: false, // 历史记录通常不需要此标记，或者默认为 false
         isDca: false,
         isHistoryOnly: true, // 仅记录，不参与持仓计算
-        timestamp: data.timestamp || Date.now()
-      }
+        timestamp: data.timestamp || Date.now(),
+        ...(activeGroupId ? { groupId: activeGroupId } : {}),
+      };
       // 按时间倒序排列
       const next = [record, ...current].sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
       const nextState = { ...prev, [fundCode]: next };
@@ -1111,6 +1322,7 @@ export default function HomePage() {
   };
 
   const handleTrade = (fund, data) => {
+    const tradeGid = activeGroupId || null;
     // 如果没有价格（API失败），加入待处理队列
     if (!data.price || data.price === 0) {
         const pending = {
@@ -1126,7 +1338,8 @@ export default function HomePage() {
             date: data.date,
             isAfter3pm: data.isAfter3pm,
             isDca: false,
-            timestamp: Date.now()
+            timestamp: Date.now(),
+            ...(tradeGid ? { groupId: tradeGid } : {}),
         };
 
         const next = [...pendingTrades, pending];
@@ -1134,7 +1347,8 @@ export default function HomePage() {
         storageHelper.setItem('pendingTrades', JSON.stringify(next));
 
         // 如果该基金没有持仓数据，初始化持仓金额为 0
-        if (!holdings[fund.code]) {
+        const tabH = tradeGid ? (groupHoldings[tradeGid] || {}) : holdings;
+        if (!tabH[fund.code]) {
           handleSaveHolding(fund.code, { share: 0, cost: 0 });
         }
 
@@ -1143,7 +1357,7 @@ export default function HomePage() {
         return;
     }
 
-    const current = holdings[fund.code] || { share: 0, cost: 0 };
+    const current = (tradeGid ? (groupHoldings[tradeGid] || {}) : holdings)[fund.code] || { share: 0, cost: 0 };
     const isBuy = tradeModal.type === 'buy';
 
     let newShare, newCost;
@@ -1168,7 +1382,7 @@ export default function HomePage() {
     handleSaveHolding(fund.code, { share: newShare, cost: newCost });
 
     setTransactions(prev => {
-      const current = prev[fund.code] || [];
+      const curList = prev[fund.code] || [];
       const record = {
         id: uuidv4(),
         type: tradeModal.type,
@@ -1178,9 +1392,10 @@ export default function HomePage() {
         date: data.date,
         isAfter3pm: data.isAfter3pm,
         isDca: false,
-        timestamp: Date.now()
+        timestamp: Date.now(),
+        ...(tradeGid ? { groupId: tradeGid } : {}),
       };
-      const next = [record, ...current];
+      const next = [record, ...curList];
       const nextState = { ...prev, [fund.code]: next };
       storageHelper.setItem('transactions', JSON.stringify(nextState));
       return nextState;
@@ -1738,7 +1953,7 @@ export default function HomePage() {
 
   const storageHelper = useMemo(() => {
     // 仅以下 key 参与云端同步；fundValuationTimeseries 不同步到云端（测试中功能，暂不同步）
-    const keys = new Set(['funds', 'favorites', 'groups', 'collapsedCodes', 'collapsedTrends', 'collapsedEarnings', 'refreshMs', 'holdings', 'pendingTrades', 'transactions', 'dcaPlans', 'customSettings', 'fundDailyEarnings']);
+    const keys = new Set(['funds', 'favorites', 'groups', 'collapsedCodes', 'collapsedTrends', 'collapsedEarnings', 'refreshMs', 'holdings', 'groupHoldings', 'pendingTrades', 'transactions', 'dcaPlans', 'customSettings', 'fundDailyEarnings']);
     const triggerSync = (key, prevValue, nextValue) => {
       if (keys.has(key)) {
         // 标记为脏数据
@@ -1787,7 +2002,7 @@ export default function HomePage() {
 
   useEffect(() => {
     // 仅以下 key 的变更会触发云端同步；fundValuationTimeseries 不在其中
-    const keys = new Set(['funds', 'favorites', 'groups', 'collapsedCodes', 'collapsedTrends', 'collapsedEarnings', 'refreshMs', 'holdings', 'pendingTrades', 'dcaPlans', 'customSettings', 'fundDailyEarnings']);
+    const keys = new Set(['funds', 'favorites', 'groups', 'collapsedCodes', 'collapsedTrends', 'collapsedEarnings', 'refreshMs', 'holdings', 'groupHoldings', 'pendingTrades', 'dcaPlans', 'customSettings', 'fundDailyEarnings']);
     const onStorage = (e) => {
       if (!e.key) return;
       if (e.key === 'localUpdatedAt') {
@@ -1889,87 +2104,108 @@ export default function HomePage() {
     const codesSet = new Set(funds.map((f) => f.code));
     if (codesSet.size === 0) return;
 
+    const scoped = migrateDcaPlansToScoped(dcaPlans);
+    const groupIdSet = new Set(groups.map((g) => g?.id).filter(Boolean));
+
     const today = toTz(todayStr).startOf('day');
-    const nextPlans = { ...dcaPlans };
+    let nextPlans;
+    try {
+      nextPlans = JSON.parse(JSON.stringify(scoped));
+    } catch {
+      nextPlans = { ...scoped };
+    }
     const newPending = [];
 
-    // 预加载回溯区间内所有年份的节假日数据
     const years = new Set([today.year()]);
-    Object.values(dcaPlans).forEach((plan) => {
-      if (plan?.firstDate) years.add(toTz(plan.firstDate).year());
-      if (plan?.lastDate) years.add(toTz(plan.lastDate).year());
+    Object.values(scoped).forEach((bucket) => {
+      if (!isPlainObject(bucket)) return;
+      Object.values(bucket).forEach((plan) => {
+        if (plan?.firstDate) years.add(toTz(plan.firstDate).year());
+        if (plan?.lastDate) years.add(toTz(plan.lastDate).year());
+      });
     });
     await loadHolidaysForYears([...years]);
 
-    Object.entries(dcaPlans).forEach(([code, plan]) => {
-      if (!plan || !plan.enabled) return;
-      if (!codesSet.has(code)) return;
+    const processBucket = (scopeKey, bucket) => {
+      if (!isPlainObject(bucket)) return;
+      const tradeGid = scopeKey === DCA_SCOPE_GLOBAL ? null : scopeKey;
+      if (tradeGid && !groupIdSet.has(tradeGid)) return;
 
-      const amount = Number(plan.amount);
-      const feeRate = Number(plan.feeRate) || 0;
-      if (!amount || amount <= 0) return;
+      Object.entries(bucket).forEach(([code, plan]) => {
+        if (!plan || !plan.enabled) return;
+        if (!codesSet.has(code)) return;
 
-      const cycle = plan.cycle || 'monthly';
-      if (!plan.firstDate) return;
+        const amount = Number(plan.amount);
+        const feeRate = Number(plan.feeRate) || 0;
+        if (!amount || amount <= 0) return;
 
-      const first = toTz(plan.firstDate).startOf('day');
-      if (today.isBefore(first, 'day')) return;
+        const cycle = plan.cycle || 'monthly';
+        if (!plan.firstDate) return;
 
-      const last = plan.lastDate ? toTz(plan.lastDate).startOf('day') : null;
+        const first = toTz(plan.firstDate).startOf('day');
+        if (today.isBefore(first, 'day')) return;
 
-      // 回溯补单：从 lastDate (若不存在则从 firstDate 前一天) 开始，按周期一直推到今天
-      let anchor = last ? last : first.clone().subtract(1, 'day');
-      let current = anchor;
-      let lastGenerated = null;
+        const last = plan.lastDate ? toTz(plan.lastDate).startOf('day') : null;
 
-      const stepOnce = () => {
-        if (cycle === 'daily') return current.add(1, 'day');
-        if (cycle === 'weekly') return current.add(1, 'week');
-        if (cycle === 'biweekly') return current.add(2, 'week');
-        if (cycle === 'monthly') return current.add(1, 'month');
-        return current.add(1, 'day');
-      };
+        let anchor = last ? last : first.clone().subtract(1, 'day');
+        let current = anchor;
+        let lastGenerated = null;
 
-      // 循环生成所有 <= today 的应扣款日
-      while (true) {
-        current = stepOnce();
-        if (current.isAfter(today, 'day')) break;
-        if (current.isBefore(first, 'day')) continue;
-
-        // 回溯补单：严格判断该日是否为 A股交易日（排除周末、法定节假日）
-        if (!isDateTradingDay(current)) continue;
-
-        const dateStr = current.format('YYYY-MM-DD');
-
-        const pending = {
-          id: `dca_${code}_${dateStr}_${Date.now()}`,
-          fundCode: code,
-          fundName: (funds.find(f => f.code === code) || {}).name,
-          type: 'buy',
-          share: null,
-          amount,
-          feeRate,
-          feeMode: undefined,
-          feeValue: undefined,
-          date: dateStr,
-          isAfter3pm: false,
-          isDca: true,
-          timestamp: Date.now()
+        const stepOnce = () => {
+          if (cycle === 'daily') return current.add(1, 'day');
+          if (cycle === 'weekly') return current.add(1, 'week');
+          if (cycle === 'biweekly') return current.add(2, 'week');
+          if (cycle === 'monthly') return current.add(1, 'month');
+          return current.add(1, 'day');
         };
-        newPending.push(pending);
-        lastGenerated = current;
-      }
 
-      if (lastGenerated) {
-        nextPlans[code] = {
-          ...plan,
-          lastDate: lastGenerated.format('YYYY-MM-DD')
-        };
-      }
+        while (true) {
+          current = stepOnce();
+          if (current.isAfter(today, 'day')) break;
+          if (current.isBefore(first, 'day')) continue;
+
+          if (!isDateTradingDay(current)) continue;
+
+          const dateStr = current.format('YYYY-MM-DD');
+
+          const pending = {
+            id: `dca_${scopeKey}_${code}_${dateStr}_${Date.now()}`,
+            fundCode: code,
+            fundName: (funds.find(f => f.code === code) || {}).name,
+            type: 'buy',
+            share: null,
+            amount,
+            feeRate,
+            feeMode: undefined,
+            feeValue: undefined,
+            date: dateStr,
+            isAfter3pm: false,
+            isDca: true,
+            timestamp: Date.now(),
+            ...(tradeGid ? { groupId: tradeGid } : {}),
+          };
+          newPending.push(pending);
+          lastGenerated = current;
+        }
+
+        if (lastGenerated) {
+          if (!nextPlans[scopeKey]) nextPlans[scopeKey] = {};
+          nextPlans[scopeKey][code] = {
+            ...plan,
+            lastDate: lastGenerated.format('YYYY-MM-DD')
+          };
+        }
+      });
+    };
+
+    processBucket(DCA_SCOPE_GLOBAL, scoped[DCA_SCOPE_GLOBAL]);
+    Object.keys(scoped).forEach((k) => {
+      if (k === DCA_SCOPE_GLOBAL) return;
+      processBucket(k, scoped[k]);
     });
 
     if (newPending.length === 0) {
-      if (JSON.stringify(nextPlans) !== JSON.stringify(dcaPlans)) {
+      if (JSON.stringify(nextPlans) !== JSON.stringify(scoped)) {
         setDcaPlans(nextPlans);
         storageHelper.setItem('dcaPlans', JSON.stringify(nextPlans));
       }
@@ -1986,7 +2222,7 @@ export default function HomePage() {
     });
 
     showToast(`已生成 ${newPending.length} 笔定投买入`, 'success');
-  }, [isTradingDay, dcaPlans, funds, todayStr, storageHelper]);
+  }, [isTradingDay, dcaPlans, funds, todayStr, storageHelper, groups]);
 
   useEffect(() => {
     if (!isTradingDay) return;
@@ -2013,6 +2249,26 @@ export default function HomePage() {
     setGroups(next);
     storageHelper.setItem('groups', JSON.stringify(next));
     if (currentTab === id) setCurrentTab('all');
+    setGroupHoldings((prev) => {
+      if (!prev[id]) return prev;
+      const nextGh = { ...prev };
+      delete nextGh[id];
+      storageHelper.setItem('groupHoldings', JSON.stringify(nextGh));
+      return nextGh;
+    });
+    setDcaPlans((prev) => {
+      const scoped = migrateDcaPlansToScoped(prev);
+      if (!scoped[id]) return prev;
+      const nextDca = { ...scoped };
+      delete nextDca[id];
+      storageHelper.setItem('dcaPlans', JSON.stringify(nextDca));
+      return nextDca;
+    });
+    setPendingTrades((prev) => {
+      const nextP = prev.filter((t) => t.groupId !== id);
+      storageHelper.setItem('pendingTrades', JSON.stringify(nextP));
+      return nextP;
+    });
     try {
       const raw = window.localStorage.getItem('customSettings');
       const parsed = raw ? JSON.parse(raw) : {};
@@ -2033,6 +2289,38 @@ export default function HomePage() {
       setCurrentTab('all');
     }
     if (removedIds.length > 0) {
+      setGroupHoldings((prev) => {
+        let nextGh = { ...prev };
+        let ghChanged = false;
+        removedIds.forEach((rid) => {
+          if (nextGh[rid]) {
+            delete nextGh[rid];
+            ghChanged = true;
+          }
+        });
+        if (ghChanged) storageHelper.setItem('groupHoldings', JSON.stringify(nextGh));
+        return ghChanged ? nextGh : prev;
+      });
+      setDcaPlans((prev) => {
+        const scoped = migrateDcaPlansToScoped(prev);
+        let nextDca = { ...scoped };
+        let dcaChanged = false;
+        removedIds.forEach((rid) => {
+          if (nextDca[rid]) {
+            delete nextDca[rid];
+            dcaChanged = true;
+          }
+        });
+        if (dcaChanged) storageHelper.setItem('dcaPlans', JSON.stringify(nextDca));
+        return dcaChanged ? nextDca : prev;
+      });
+      setPendingTrades((prev) => {
+        const nextP = prev.filter((t) => !removedIds.includes(t.groupId));
+        if (nextP.length !== prev.length) {
+          storageHelper.setItem('pendingTrades', JSON.stringify(nextP));
+        }
+        return nextP;
+      });
       try {
         const raw = window.localStorage.getItem('customSettings');
         const parsed = raw ? JSON.parse(raw) : {};
@@ -2070,18 +2358,127 @@ export default function HomePage() {
     setSuccessModal({ open: true, message: `成功添加 ${codes.length} 支基金` });
   };
 
-  const removeFundFromCurrentGroup = (code) => {
-    const next = groups.map(g => {
-      if (g.id === currentTab) {
-        return {
-          ...g,
-          codes: g.codes.filter(c => c !== code)
-        };
-      }
-      return g;
+  /** 仅从指定自定义分组移除基金：分组 codes、该分组持仓/待定/交易/定投；不删 funds、全局 holdings */
+  const stripFundFromGroupScope = (code, groupId, options = {}) => {
+    const silent = options?.silent === true;
+    if (!code || !groupId) return;
+    const nextGroups = groups.map((g) =>
+      g.id === groupId ? { ...g, codes: g.codes.filter((c) => c !== code) } : g
+    );
+    setGroups(nextGroups);
+    storageHelper.setItem('groups', JSON.stringify(nextGroups));
+
+    setGroupHoldings((prev) => {
+      if (!prev[groupId]?.[code]) return prev;
+      const next = { ...prev };
+      const bucket = { ...next[groupId] };
+      delete bucket[code];
+      next[groupId] = bucket;
+      storageHelper.setItem('groupHoldings', JSON.stringify(next));
+      return next;
     });
-    setGroups(next);
-    storageHelper.setItem('groups', JSON.stringify(next));
+
+    setPendingTrades((prev) => {
+      const next = prev.filter((t) => !(t.fundCode === code && t.groupId === groupId));
+      if (next.length === prev.length) return prev;
+      storageHelper.setItem('pendingTrades', JSON.stringify(next));
+      return next;
+    });
+
+    setTransactions((prev) => {
+      const list = prev[code] || [];
+      const filtered = list.filter((t) => t.groupId !== groupId);
+      if (filtered.length === list.length) return prev;
+      const next = { ...prev };
+      if (filtered.length) next[code] = filtered;
+      else delete next[code];
+      storageHelper.setItem('transactions', JSON.stringify(next));
+      return next;
+    });
+
+    setDcaPlans((prev) => {
+      const scoped = migrateDcaPlansToScoped(prev);
+      if (!scoped[groupId]?.[code]) return prev;
+      const bucket = { ...scoped[groupId] };
+      delete bucket[code];
+      const nextScoped = { ...scoped, [groupId]: bucket };
+      storageHelper.setItem('dcaPlans', JSON.stringify(nextScoped));
+      return nextScoped;
+    });
+
+    if (!silent) showToast('已从当前分组移除该基金', 'success');
+  };
+
+  /** 批量从同一自定义分组移除（单次合并更新，避免闭包叠加 strip 失效） */
+  const stripManyFundsFromGroupScope = (codes, groupId) => {
+    const set = new Set((codes || []).filter(Boolean));
+    if (!groupId || set.size === 0) return;
+
+    setGroups((prev) => {
+      const next = prev.map((g) =>
+        g.id === groupId ? { ...g, codes: g.codes.filter((c) => !set.has(c)) } : g
+      );
+      storageHelper.setItem('groups', JSON.stringify(next));
+      return next;
+    });
+
+    setGroupHoldings((prev) => {
+      if (!prev[groupId]) return prev;
+      const bucket = { ...prev[groupId] };
+      let changed = false;
+      for (const c of set) {
+        if (bucket[c]) {
+          delete bucket[c];
+          changed = true;
+        }
+      }
+      if (!changed) return prev;
+      const next = { ...prev, [groupId]: bucket };
+      storageHelper.setItem('groupHoldings', JSON.stringify(next));
+      return next;
+    });
+
+    setPendingTrades((prev) => {
+      const next = prev.filter((t) => !(set.has(t.fundCode) && t.groupId === groupId));
+      if (next.length === prev.length) return prev;
+      storageHelper.setItem('pendingTrades', JSON.stringify(next));
+      return next;
+    });
+
+    setTransactions((prev) => {
+      let next = { ...prev };
+      let changed = false;
+      for (const c of set) {
+        const list = next[c];
+        if (!list?.length) continue;
+        const filtered = list.filter((t) => t.groupId !== groupId);
+        if (filtered.length !== list.length) {
+          changed = true;
+          if (filtered.length) next[c] = filtered;
+          else delete next[c];
+        }
+      }
+      if (!changed) return prev;
+      storageHelper.setItem('transactions', JSON.stringify(next));
+      return next;
+    });
+
+    setDcaPlans((prev) => {
+      const scoped = migrateDcaPlansToScoped(prev);
+      if (!scoped[groupId]) return prev;
+      const bucket = { ...scoped[groupId] };
+      let changed = false;
+      for (const c of set) {
+        if (bucket[c]) {
+          delete bucket[c];
+          changed = true;
+        }
+      }
+      if (!changed) return prev;
+      const nextScoped = { ...scoped, [groupId]: bucket };
+      storageHelper.setItem('dcaPlans', JSON.stringify(nextScoped));
+      return nextScoped;
+    });
   };
 
   const toggleFundInGroup = (code, groupId) => {
@@ -2244,14 +2641,28 @@ export default function HomePage() {
       if (isPlainObject(savedHoldings)) {
         setHoldings(savedHoldings);
       }
+      const savedGroupHoldings = JSON.parse(localStorage.getItem('groupHoldings') || '{}');
+      let initialGH = isPlainObject(savedGroupHoldings) ? savedGroupHoldings : {};
+      const seedGh = seedGroupHoldingsFromGlobal(
+        isPlainObject(savedHoldings) ? savedHoldings : {},
+        Array.isArray(savedGroups) ? savedGroups : [],
+        initialGH
+      );
+      if (seedGh.changed) {
+        initialGH = seedGh.next;
+        storageHelper.setItem('groupHoldings', JSON.stringify(initialGH));
+      }
+      setGroupHoldings(initialGH);
       const savedTransactions = JSON.parse(localStorage.getItem('transactions') || '{}');
       if (isPlainObject(savedTransactions)) {
         setTransactions(savedTransactions);
       }
       const savedDcaPlans = JSON.parse(localStorage.getItem('dcaPlans') || '{}');
-      if (isPlainObject(savedDcaPlans)) {
-        setDcaPlans(savedDcaPlans);
+      const migratedDca = migrateDcaPlansToScoped(isPlainObject(savedDcaPlans) ? savedDcaPlans : {});
+      if (JSON.stringify(migratedDca) !== JSON.stringify(savedDcaPlans)) {
+        storageHelper.setItem('dcaPlans', JSON.stringify(migratedDca));
       }
+      setDcaPlans(migratedDca);
       const savedViewMode = localStorage.getItem('viewMode');
       if (savedViewMode === 'card' || savedViewMode === 'list') {
         setViewMode(savedViewMode);
@@ -2274,6 +2685,17 @@ export default function HomePage() {
     if (!hasLocalTabInitRef.current) return;
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [currentTab]);
+
+  // 全局持仓或分组成员变化时，按分组幂等补全子账本（不覆盖已有分组持仓）
+  useEffect(() => {
+    if (!hasLocalTabInitRef.current) return;
+    setGroupHoldings((prev) => {
+      const { next, changed } = seedGroupHoldingsFromGlobal(holdings, groups, prev);
+      if (!changed) return prev;
+      storageHelper.setItem('groupHoldings', JSON.stringify(next));
+      return next;
+    });
+  }, [holdings, groups]);
 
   // 记录用户当前选择的分组（仅本地存储，不同步云端）
   useEffect(() => {
@@ -2924,10 +3346,40 @@ export default function HomePage() {
   };
 
   const requestRemoveFund = (fund) => {
+    const gid =
+      currentTab !== 'all' && currentTab !== 'fav' && groups.some((g) => g.id === currentTab)
+        ? currentTab
+        : null;
+
+    if (gid) {
+      const gh = groupHoldings[gid]?.[fund.code];
+      const hasGroupHolding = gh && isNumber(gh.share) && gh.share > 0;
+      const hasGroupPending = pendingTrades.some(
+        (t) => t.fundCode === fund.code && t.groupId === gid
+      );
+      const scoped = migrateDcaPlansToScoped(dcaPlans);
+      const hasGroupDca = !!(scoped[gid]?.[fund.code]);
+      const txList = transactions[fund.code] || [];
+      const hasGroupTx = txList.some((t) => t.groupId === gid);
+      const needsConfirm = hasGroupHolding || hasGroupPending || hasGroupDca || hasGroupTx;
+      if (needsConfirm) {
+        setFundDeleteConfirm({ code: fund.code, name: fund.name, scope: 'group', groupId: gid });
+      } else {
+        fundDetailDrawerCloseRef.current?.();
+        fundDetailDialogCloseRef.current?.();
+        stripFundFromGroupScope(fund.code, gid);
+      }
+      return;
+    }
+
     const h = holdings[fund.code];
-    const hasHolding = h && isNumber(h.share) && h.share > 0;
+    const hasGlobalHolding = h && isNumber(h.share) && h.share > 0;
+    const hasGroupHolding = Object.values(groupHoldings || {}).some(
+      (b) => b && b[fund.code] && isNumber(b[fund.code].share) && b[fund.code].share > 0
+    );
+    const hasHolding = hasGlobalHolding || hasGroupHolding;
     if (hasHolding) {
-      setFundDeleteConfirm({ code: fund.code, name: fund.name });
+      setFundDeleteConfirm({ code: fund.code, name: fund.name, scope: 'global' });
     } else {
       fundDetailDrawerCloseRef.current?.();
       fundDetailDialogCloseRef.current?.();
@@ -3032,6 +3484,21 @@ export default function HomePage() {
       return next;
     });
 
+    setGroupHoldings((prev) => {
+      const next = {};
+      let changed = false;
+      for (const gid of Object.keys(prev || {})) {
+        const bucket = { ...(prev[gid] || {}) };
+        if (bucket[removeCode]) {
+          delete bucket[removeCode];
+          changed = true;
+        }
+        next[gid] = bucket;
+      }
+      if (changed) storageHelper.setItem('groupHoldings', JSON.stringify(next));
+      return changed ? next : prev;
+    });
+
     // 同步删除待处理交易
     setPendingTrades(prev => {
       const next = prev.filter((trade) => trade?.fundCode !== removeCode);
@@ -3070,13 +3537,231 @@ export default function HomePage() {
       storageHelper.setItem('fundDailyEarnings', raw);
     } catch { }
 
-    // 同步删除该基金的定投计划
-    setDcaPlans(prev => {
-      if (!prev || !prev[removeCode]) return prev;
-      const next = { ...prev };
-      delete next[removeCode];
-      storageHelper.setItem('dcaPlans', JSON.stringify(next));
+    // 同步删除该基金的定投计划（所有 scope）
+    setDcaPlans((prev) => {
+      const scoped = migrateDcaPlansToScoped(prev);
+      const nextScoped = {};
+      let changed = false;
+      for (const [scope, bucket] of Object.entries(scoped)) {
+        if (!isPlainObject(bucket)) continue;
+        const nb = { ...bucket };
+        if (nb[removeCode]) {
+          delete nb[removeCode];
+          changed = true;
+        }
+        nextScoped[scope] = nb;
+      }
+      if (!changed) return prev;
+      storageHelper.setItem('dcaPlans', JSON.stringify(nextScoped));
+      return nextScoped;
+    });
+  };
+
+  /** 批量从「全部」逻辑删除多支基金（单次合并更新） */
+  const removeFundsBulk = (codes) => {
+    const set = new Set((codes || []).filter(Boolean));
+    if (set.size === 0) return;
+
+    setFunds((prev) => {
+      const next = prev.filter((f) => !set.has(f.code));
+      storageHelper.setItem('funds', JSON.stringify(next));
       return next;
+    });
+
+    setGroups((prev) => {
+      const next = prev.map((g) => ({
+        ...g,
+        codes: g.codes.filter((c) => !set.has(c)),
+      }));
+      storageHelper.setItem('groups', JSON.stringify(next));
+      return next;
+    });
+
+    setCollapsedCodes((prev) => {
+      let nextSet = prev;
+      let changed = false;
+      for (const c of set) {
+        if (nextSet.has(c)) {
+          if (!changed) {
+            nextSet = new Set(nextSet);
+            changed = true;
+          }
+          nextSet.delete(c);
+        }
+      }
+      if (changed) storageHelper.setItem('collapsedCodes', JSON.stringify(Array.from(nextSet)));
+      return changed ? nextSet : prev;
+    });
+
+    setCollapsedTrends((prev) => {
+      let nextSet = prev;
+      let changed = false;
+      for (const c of set) {
+        if (nextSet.has(c)) {
+          if (!changed) {
+            nextSet = new Set(nextSet);
+            changed = true;
+          }
+          nextSet.delete(c);
+        }
+      }
+      if (changed) storageHelper.setItem('collapsedTrends', JSON.stringify(Array.from(nextSet)));
+      return changed ? nextSet : prev;
+    });
+
+    setCollapsedEarnings((prev) => {
+      let nextSet = prev;
+      let changed = false;
+      for (const c of set) {
+        if (nextSet.has(c)) {
+          if (!changed) {
+            nextSet = new Set(nextSet);
+            changed = true;
+          }
+          nextSet.delete(c);
+        }
+      }
+      if (changed) storageHelper.setItem('collapsedEarnings', JSON.stringify(Array.from(nextSet)));
+      return changed ? nextSet : prev;
+    });
+
+    setFavorites((prev) => {
+      let nextSet = prev;
+      let changed = false;
+      for (const c of set) {
+        if (nextSet.has(c)) {
+          if (!changed) {
+            nextSet = new Set(nextSet);
+            changed = true;
+          }
+          nextSet.delete(c);
+        }
+      }
+      if (changed) {
+        storageHelper.setItem('favorites', JSON.stringify(Array.from(nextSet)));
+        if (nextSet.size === 0) setCurrentTab('all');
+      }
+      return changed ? nextSet : prev;
+    });
+
+    setHoldings((prev) => {
+      let next = prev;
+      let changed = false;
+      for (const c of set) {
+        if (next[c]) {
+          if (!changed) {
+            next = { ...prev };
+            changed = true;
+          }
+          delete next[c];
+        }
+      }
+      if (changed) storageHelper.setItem('holdings', JSON.stringify(next));
+      return changed ? next : prev;
+    });
+
+    setGroupHoldings((prev) => {
+      const next = {};
+      let changed = false;
+      for (const gid of Object.keys(prev || {})) {
+        const bucket = { ...(prev[gid] || {}) };
+        for (const c of set) {
+          if (bucket[c]) {
+            delete bucket[c];
+            changed = true;
+          }
+        }
+        next[gid] = bucket;
+      }
+      if (changed) storageHelper.setItem('groupHoldings', JSON.stringify(next));
+      return changed ? next : prev;
+    });
+
+    setPendingTrades((prev) => {
+      const next = prev.filter((t) => !set.has(t?.fundCode));
+      if (next.length === prev.length) return prev;
+      storageHelper.setItem('pendingTrades', JSON.stringify(next));
+      return next;
+    });
+
+    setTransactions((prev) => {
+      let next = prev;
+      let changed = false;
+      for (const c of set) {
+        if (next[c]) {
+          if (!changed) {
+            next = { ...prev };
+            changed = true;
+          }
+          delete next[c];
+        }
+      }
+      if (changed) storageHelper.setItem('transactions', JSON.stringify(next));
+      return changed ? next : prev;
+    });
+
+    for (const c of set) {
+      clearFund(c);
+    }
+
+    setValuationSeries((prev) => {
+      let next = prev;
+      let changed = false;
+      for (const c of set) {
+        if (c in next) {
+          if (!changed) {
+            next = { ...prev };
+            changed = true;
+          }
+          delete next[c];
+        }
+      }
+      return changed ? next : prev;
+    });
+
+    try {
+      for (const c of set) {
+        clearDailyEarnings(c);
+      }
+      setFundDailyEarnings((prev) => {
+        if (!prev) return prev;
+        let next = prev;
+        let changed = false;
+        for (const c of set) {
+          if (c in next) {
+            if (!changed) {
+              next = { ...prev };
+              changed = true;
+            }
+            delete next[c];
+          }
+        }
+        if (changed) {
+          const raw = localStorage.getItem('fundDailyEarnings') || '{}';
+          storageHelper.setItem('fundDailyEarnings', raw);
+        }
+        return changed ? next : prev;
+      });
+    } catch { /* empty */ }
+
+    setDcaPlans((prev) => {
+      const scoped = migrateDcaPlansToScoped(prev);
+      let changed = false;
+      const nextScoped = {};
+      for (const [scope, bucket] of Object.entries(scoped)) {
+        if (!isPlainObject(bucket)) continue;
+        const nb = { ...bucket };
+        for (const c of set) {
+          if (nb[c]) {
+            delete nb[c];
+            changed = true;
+          }
+        }
+        nextScoped[scope] = nb;
+      }
+      if (!changed) return prev;
+      storageHelper.setItem('dcaPlans', JSON.stringify(nextScoped));
+      return nextScoped;
     });
   };
 
@@ -3203,6 +3888,8 @@ export default function HomePage() {
           .sort((a, b) => a.id.localeCompare(b.id))
       : [];
 
+    const validGroupIds = new Set(groups.map((g) => g.id));
+
     const holdingsSource = isPlainObject(payload.holdings) ? payload.holdings : {};
     const holdings = {};
     Object.keys(holdingsSource)
@@ -3217,12 +3904,35 @@ export default function HomePage() {
         holdings[code] = { share, cost };
       });
 
+    const ghSource = isPlainObject(payload.groupHoldings) ? payload.groupHoldings : {};
+    const groupHoldingsNorm = {};
+    Object.keys(ghSource)
+      .map(normalizeCode)
+      .filter((gid) => validGroupIds.has(gid))
+      .sort()
+      .forEach((gid) => {
+        const bucket = ghSource[gid] || {};
+        const inner = {};
+        Object.keys(bucket)
+          .map(normalizeCode)
+          .filter((code) => uniqueFundCodes.includes(code))
+          .sort()
+          .forEach((code) => {
+            const value = bucket[code] || {};
+            const share = normalizeNumber(value.share);
+            const cost = normalizeNumber(value.cost);
+            if (share === null && cost === null) return;
+            inner[code] = { share, cost };
+          });
+        if (Object.keys(inner).length) groupHoldingsNorm[gid] = inner;
+      });
+
     const pendingTrades = Array.isArray(payload.pendingTrades)
       ? payload.pendingTrades
           .map((trade) => {
             const fundCode = normalizeCode(trade?.fundCode);
             if (!fundCode) return null;
-            return {
+            const row = {
               id: trade?.id ? String(trade.id) : '',
               fundCode,
               type: trade?.type || '',
@@ -3233,13 +3943,21 @@ export default function HomePage() {
               feeValue: normalizeNumber(trade?.feeValue),
               date: trade?.date || '',
               isAfter3pm: !!trade?.isAfter3pm,
-              isDca: !!trade?.isDca
+              isDca: !!trade?.isDca,
             };
+            const g = trade?.groupId != null && trade.groupId !== '' ? normalizeCode(trade.groupId) : null;
+            if (g) {
+              if (!validGroupIds.has(g)) return null;
+              row.groupId = g;
+            }
+            return row;
           })
           .filter((trade) => trade && uniqueFundCodes.includes(trade.fundCode))
           .sort((a, b) => {
-            const keyA = a.id || `${a.fundCode}|${a.type}|${a.date}|${a.share ?? ''}|${a.amount ?? ''}|${a.feeMode}|${a.feeValue ?? ''}|${a.feeRate ?? ''}|${a.isAfter3pm ? 1 : 0}|${a.isDca ? 1 : 0}`;
-            const keyB = b.id || `${b.fundCode}|${b.type}|${b.date}|${b.share ?? ''}|${b.amount ?? ''}|${b.feeMode}|${b.feeValue ?? ''}|${b.feeRate ?? ''}|${b.isAfter3pm ? 1 : 0}|${b.isDca ? 1 : 0}`;
+            const gidA = a.groupId || '';
+            const gidB = b.groupId || '';
+            const keyA = a.id || `${gidA}|${a.fundCode}|${a.type}|${a.date}|${a.share ?? ''}|${a.amount ?? ''}|${a.feeMode}|${a.feeValue ?? ''}|${a.feeRate ?? ''}|${a.isAfter3pm ? 1 : 0}|${a.isDca ? 1 : 0}`;
+            const keyB = b.id || `${gidB}|${b.fundCode}|${b.type}|${b.date}|${b.share ?? ''}|${b.amount ?? ''}|${b.feeMode}|${b.feeValue ?? ''}|${b.feeRate ?? ''}|${b.isAfter3pm ? 1 : 0}|${b.isDca ? 1 : 0}`;
             return keyA.localeCompare(keyB);
           })
       : [];
@@ -3262,40 +3980,57 @@ export default function HomePage() {
             const date = t?.date || '';
             const timestamp = Number.isFinite(t?.timestamp) ? t.timestamp : 0;
             const isDca = !!t?.isDca;
-            return { id, type, share, amount, price, date, timestamp, isDca };
+            const isHistoryOnly = !!t?.isHistoryOnly;
+            const row = { id, type, share, amount, price, date, timestamp, isDca, isHistoryOnly };
+            const g = t?.groupId != null && t.groupId !== '' ? normalizeCode(t.groupId) : null;
+            if (g) {
+              if (!validGroupIds.has(g)) return null;
+              row.groupId = g;
+            }
+            return row;
           })
-          .filter((t) => t.id || t.timestamp)
+          .filter((t) => t && (t.id || t.timestamp))
           .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
         if (normalized.length > 0) transactions[code] = normalized;
       });
 
-    const dcaSource = isPlainObject(payload.dcaPlans) ? payload.dcaPlans : {};
+    const dcaScoped = migrateDcaPlansToScoped(isPlainObject(payload.dcaPlans) ? payload.dcaPlans : {});
     const dcaPlans = {};
-    Object.keys(dcaSource)
-      .map(normalizeCode)
-      .filter((code) => uniqueFundCodes.includes(code))
+    Object.keys(dcaScoped)
       .sort()
-      .forEach((code) => {
-        const plan = dcaSource[code] || {};
-        const amount = normalizeNumber(plan.amount);
-        const feeRate = normalizeNumber(plan.feeRate);
-        const cycle = ['daily', 'weekly', 'biweekly', 'monthly'].includes(plan.cycle) ? plan.cycle : '';
-        const firstDate = plan.firstDate ? String(plan.firstDate) : '';
-        const enabled = !!plan.enabled;
-        const weeklyDay = normalizeNumber(plan.weeklyDay);
-        const monthlyDay = normalizeNumber(plan.monthlyDay);
-        const lastDate = plan.lastDate ? String(plan.lastDate) : '';
-        if (amount === null && feeRate === null && !cycle && !firstDate && !enabled && weeklyDay === null && monthlyDay === null && !lastDate) return;
-        dcaPlans[code] = {
-          amount,
-          feeRate,
-          cycle,
-          firstDate,
-          enabled,
-          weeklyDay: weeklyDay !== null ? weeklyDay : null,
-          monthlyDay: monthlyDay !== null ? monthlyDay : null,
-          lastDate
-        };
+      .forEach((scopeKeyRaw) => {
+        const scopeKey = normalizeCode(scopeKeyRaw);
+        if (scopeKey !== DCA_SCOPE_GLOBAL && !validGroupIds.has(scopeKey)) return;
+        const bucket = dcaScoped[scopeKeyRaw];
+        if (!isPlainObject(bucket)) return;
+        const inner = {};
+        Object.keys(bucket)
+          .map(normalizeCode)
+          .filter((code) => uniqueFundCodes.includes(code))
+          .sort()
+          .forEach((code) => {
+            const plan = bucket[code] || {};
+            const amount = normalizeNumber(plan.amount);
+            const feeRate = normalizeNumber(plan.feeRate);
+            const cycle = ['daily', 'weekly', 'biweekly', 'monthly'].includes(plan.cycle) ? plan.cycle : '';
+            const firstDate = plan.firstDate ? String(plan.firstDate) : '';
+            const enabled = !!plan.enabled;
+            const weeklyDay = normalizeNumber(plan.weeklyDay);
+            const monthlyDay = normalizeNumber(plan.monthlyDay);
+            const lastDate = plan.lastDate ? String(plan.lastDate) : '';
+            if (amount === null && feeRate === null && !cycle && !firstDate && !enabled && weeklyDay === null && monthlyDay === null && !lastDate) return;
+            inner[code] = {
+              amount,
+              feeRate,
+              cycle,
+              firstDate,
+              enabled,
+              weeklyDay: weeklyDay !== null ? weeklyDay : null,
+              monthlyDay: monthlyDay !== null ? monthlyDay : null,
+              lastDate
+            };
+          });
+        if (Object.keys(inner).length) dcaPlans[scopeKey] = inner;
       });
 
     const customSettings = isPlainObject(payload.customSettings) ? payload.customSettings : {};
@@ -3320,6 +4055,7 @@ export default function HomePage() {
       collapsedTrends,
       refreshMs: Number.isFinite(payload.refreshMs) ? payload.refreshMs : 30000,
       holdings,
+      groupHoldings: groupHoldingsNorm,
       pendingTrades,
       transactions,
       dcaPlans,
@@ -3352,6 +4088,9 @@ export default function HomePage() {
       }
       if (!keys || keys.has('holdings')) {
         all.holdings = JSON.parse(localStorage.getItem('holdings') || '{}');
+      }
+      if (!keys || keys.has('groupHoldings')) {
+        all.groupHoldings = JSON.parse(localStorage.getItem('groupHoldings') || '{}');
       }
       if (!keys || keys.has('pendingTrades')) {
         all.pendingTrades = JSON.parse(localStorage.getItem('pendingTrades') || '[]');
@@ -3429,13 +4168,52 @@ export default function HomePage() {
             }))
           : [];
 
-        const cleanedDcaPlans = isPlainObject(all.dcaPlans)
-          ? Object.entries(all.dcaPlans).reduce((acc, [code, plan]) => {
-              if (!fundCodes.has(code) || !isPlainObject(plan)) return acc;
-              acc[code] = plan;
+        const validGroupIdSet = new Set(cleanedGroups.map((g) => g?.id).filter(Boolean));
+
+        const cleanedGroupHoldings = isPlainObject(all.groupHoldings)
+          ? Object.entries(all.groupHoldings).reduce((acc, [gid, bucket]) => {
+              if (!validGroupIdSet.has(gid) || !isPlainObject(bucket)) return acc;
+              const inner = Object.entries(bucket).reduce((bacc, [code, value]) => {
+                if (!fundCodes.has(code) || !isPlainObject(value)) return bacc;
+                const parsedShare = isNumber(value.share)
+                  ? value.share
+                  : isString(value.share)
+                    ? Number(value.share)
+                    : NaN;
+                const parsedCost = isNumber(value.cost)
+                  ? value.cost
+                  : isString(value.cost)
+                    ? Number(value.cost)
+                    : NaN;
+                const nextShare = Number.isFinite(parsedShare) ? parsedShare : null;
+                const nextCost = Number.isFinite(parsedCost) ? parsedCost : null;
+                if (nextShare === null && nextCost === null) return bacc;
+                bacc[code] = {
+                  ...value,
+                  share: nextShare,
+                  cost: nextCost
+                };
+                return bacc;
+              }, {});
+              if (Object.keys(inner).length) acc[gid] = inner;
               return acc;
             }, {})
           : {};
+
+        const scopedDca = migrateDcaPlansToScoped(isPlainObject(all.dcaPlans) ? all.dcaPlans : {});
+        const cleanedDcaPlans = Object.entries(scopedDca).reduce((acc, [scopeKey, bucket]) => {
+          const sk = String(scopeKey);
+          if (sk !== DCA_SCOPE_GLOBAL && !validGroupIdSet.has(sk)) return acc;
+          if (!isPlainObject(bucket)) return acc;
+          const inner = Object.entries(bucket).reduce((bacc, [code, plan]) => {
+            if (!fundCodes.has(code) || !isPlainObject(plan)) return bacc;
+            bacc[code] = plan;
+            return bacc;
+          }, {});
+          if (Object.keys(inner).length) acc[sk] = inner;
+          return acc;
+        }, {});
+        if (!cleanedDcaPlans[DCA_SCOPE_GLOBAL]) cleanedDcaPlans[DCA_SCOPE_GLOBAL] = {};
 
         const cleanedFundDailyEarnings = isPlainObject(all.fundDailyEarnings)
           ? Object.entries(all.fundDailyEarnings).reduce((acc, [code, list]) => {
@@ -3473,6 +4251,7 @@ export default function HomePage() {
           collapsedEarnings: cleanedCollapsedEarnings,
           refreshMs: all.refreshMs,
           holdings: cleanedHoldings,
+          groupHoldings: cleanedGroupHoldings,
           pendingTrades: all.pendingTrades,
           transactions: all.transactions,
           dcaPlans: cleanedDcaPlans,
@@ -3495,9 +4274,10 @@ export default function HomePage() {
         collapsedEarnings: [],
         refreshMs: 30000,
         holdings: {},
+        groupHoldings: {},
         pendingTrades: [],
         transactions: {},
-        dcaPlans: {},
+        dcaPlans: { [DCA_SCOPE_GLOBAL]: {} },
         customSettings: {},
         exportedAt: nowInTz().toISOString()
       };
@@ -3538,8 +4318,22 @@ export default function HomePage() {
       setHoldings(nextHoldings);
       storageHelper.setItem('holdings', JSON.stringify(nextHoldings));
 
+      const cloudGroupIds = new Set(nextGroups.map((g) => g?.id).filter(Boolean));
+
+      let nextGroupHoldings = isPlainObject(cloudData.groupHoldings) ? cloudData.groupHoldings : {};
+      const seedAfterCloud = seedGroupHoldingsFromGlobal(nextHoldings, nextGroups, nextGroupHoldings);
+      if (seedAfterCloud.changed) {
+        nextGroupHoldings = seedAfterCloud.next;
+      }
+      setGroupHoldings(nextGroupHoldings);
+      storageHelper.setItem('groupHoldings', JSON.stringify(nextGroupHoldings));
+
       const nextPendingTrades = Array.isArray(cloudData.pendingTrades)
-        ? cloudData.pendingTrades.filter((trade) => trade && nextFundCodes.has(trade.fundCode))
+        ? cloudData.pendingTrades.filter((trade) => {
+            if (!trade || !nextFundCodes.has(trade.fundCode)) return false;
+            if (trade.groupId && !cloudGroupIds.has(trade.groupId)) return false;
+            return true;
+          })
         : [];
       setPendingTrades(nextPendingTrades);
       storageHelper.setItem('pendingTrades', JSON.stringify(nextPendingTrades));
@@ -3548,12 +4342,19 @@ export default function HomePage() {
       setTransactions(nextTransactions);
       storageHelper.setItem('transactions', JSON.stringify(nextTransactions));
 
-      const cloudDca = isPlainObject(cloudData.dcaPlans) ? cloudData.dcaPlans : {};
-      const nextDcaPlans = Object.entries(cloudDca).reduce((acc, [code, plan]) => {
-        if (!nextFundCodes.has(code) || !isPlainObject(plan)) return acc;
-        acc[code] = plan;
-        return acc;
-      }, {});
+      const cloudDcaScoped = migrateDcaPlansToScoped(isPlainObject(cloudData.dcaPlans) ? cloudData.dcaPlans : {});
+      const nextDcaPlans = {};
+      Object.entries(cloudDcaScoped).forEach(([scopeKey, bucket]) => {
+        if (scopeKey !== DCA_SCOPE_GLOBAL && !cloudGroupIds.has(scopeKey)) return;
+        if (!isPlainObject(bucket)) return;
+        const inner = {};
+        Object.entries(bucket).forEach(([code, plan]) => {
+          if (!nextFundCodes.has(code) || !isPlainObject(plan)) return;
+          inner[code] = plan;
+        });
+        if (Object.keys(inner).length) nextDcaPlans[scopeKey] = inner;
+      });
+      if (!nextDcaPlans[DCA_SCOPE_GLOBAL]) nextDcaPlans[DCA_SCOPE_GLOBAL] = {};
       setDcaPlans(nextDcaPlans);
       storageHelper.setItem('dcaPlans', JSON.stringify(nextDcaPlans));
 
@@ -3740,6 +4541,7 @@ export default function HomePage() {
         refreshMs: parseInt(localStorage.getItem('refreshMs') || '30000', 10),
         viewMode: localStorage.getItem('viewMode') === 'list' ? 'list' : 'card',
         holdings: JSON.parse(localStorage.getItem('holdings') || '{}'),
+        groupHoldings: JSON.parse(localStorage.getItem('groupHoldings') || '{}'),
         pendingTrades: JSON.parse(localStorage.getItem('pendingTrades') || '[]'),
         transactions: JSON.parse(localStorage.getItem('transactions') || '{}'),
         dcaPlans: JSON.parse(localStorage.getItem('dcaPlans') || '{}'),
@@ -3799,6 +4601,7 @@ export default function HomePage() {
         const currentEarnings = JSON.parse(localStorage.getItem('collapsedEarnings') || '[]');
         const currentPendingTrades = JSON.parse(localStorage.getItem('pendingTrades') || '[]');
         const currentDcaPlans = JSON.parse(localStorage.getItem('dcaPlans') || '{}');
+        const currentGroupHoldings = JSON.parse(localStorage.getItem('groupHoldings') || '{}');
 
         let mergedFunds = currentFunds;
         let appendedCodes = [];
@@ -3871,6 +4674,16 @@ export default function HomePage() {
           storageHelper.setItem('holdings', JSON.stringify(mergedHoldings));
         }
 
+        if (isPlainObject(data.groupHoldings)) {
+          const mergedGH = { ...(isPlainObject(currentGroupHoldings) ? currentGroupHoldings : {}) };
+          Object.entries(data.groupHoldings).forEach(([gid, bucket]) => {
+            if (!isPlainObject(bucket)) return;
+            mergedGH[gid] = { ...(mergedGH[gid] || {}), ...bucket };
+          });
+          setGroupHoldings(mergedGH);
+          storageHelper.setItem('groupHoldings', JSON.stringify(mergedGH));
+        }
+
         if (isPlainObject(data.transactions)) {
              const currentTransactions = JSON.parse(localStorage.getItem('transactions') || '{}');
              const mergedTransactions = { ...currentTransactions };
@@ -3891,7 +4704,7 @@ export default function HomePage() {
           const fundCodeSet = new Set(mergedFunds.map((f) => f.code));
           const keyOf = (trade) => {
             if (trade?.id) return `id:${trade.id}`;
-            return `k:${trade?.fundCode || ''}:${trade?.type || ''}:${trade?.date || ''}:${trade?.share || ''}:${trade?.amount || ''}:${trade?.isAfter3pm ? 1 : 0}`;
+            return `k:${trade?.groupId || ''}:${trade?.fundCode || ''}:${trade?.type || ''}:${trade?.date || ''}:${trade?.share || ''}:${trade?.amount || ''}:${trade?.isAfter3pm ? 1 : 0}`;
           };
           const mergedPendingMap = new Map();
           existingPending.forEach((trade) => {
@@ -3908,7 +4721,14 @@ export default function HomePage() {
         }
 
         if (isPlainObject(data.dcaPlans)) {
-          const mergedDca = { ...(isPlainObject(currentDcaPlans) ? currentDcaPlans : {}), ...data.dcaPlans };
+          const mergedDca = { ...migrateDcaPlansToScoped(currentDcaPlans) };
+          const incomingScoped = migrateDcaPlansToScoped(data.dcaPlans);
+          Object.keys(incomingScoped).forEach((scope) => {
+            mergedDca[scope] = {
+              ...(isPlainObject(mergedDca[scope]) ? mergedDca[scope] : {}),
+              ...(isPlainObject(incomingScoped[scope]) ? incomingScoped[scope] : {}),
+            };
+          });
           setDcaPlans(mergedDca);
           storageHelper.setItem('dcaPlans', JSON.stringify(mergedDca));
         }
@@ -4609,7 +5429,7 @@ export default function HomePage() {
             <>
               <GroupSummary
                   funds={displayFunds}
-                  holdings={holdings}
+                  holdings={holdingsForTab}
                   groupName={getGroupName()}
                   getProfit={getHoldingProfit}
                   stickyTop={navbarHeight + marketIndexAccordionHeight + filterBarHeight + (isMobile ? -14 : 0)}
@@ -4655,10 +5475,6 @@ export default function HomePage() {
                                   if (!row || !row.code) return;
                                   toggleFavorite(row.code);
                                 }}
-                                onRemoveFromGroup={(row) => {
-                                  if (!row || !row.code) return;
-                                  removeFundFromCurrentGroup(row.code);
-                                }}
                                 onHoldingAmountClick={(row, meta) => {
                                   if (!row || !row.code) return;
                                   const fund = row.rawFund || { code: row.code, name: row.fundName };
@@ -4685,8 +5501,8 @@ export default function HomePage() {
                                     todayStr,
                                     currentTab,
                                     favorites,
-                                    dcaPlans,
-                                    holdings,
+                                    dcaPlans: dcaPlansForTab,
+                                    holdings: holdingsForTab,
                                     percentModes,
                                     todayPercentModes,
                                     fundDailyEarnings,
@@ -4694,12 +5510,11 @@ export default function HomePage() {
                                     collapsedCodes,
                                     collapsedTrends,
                                     collapsedEarnings,
-                                    transactions,
+                                    transactions: transactionsForTab,
                                     theme,
                                     isTradingDay,
                                     refreshing,
                                     getHoldingProfit,
-                                    onRemoveFromGroup: removeFundFromCurrentGroup,
                                     onToggleFavorite: toggleFavorite,
                                     onRemoveFund: requestRemoveFund,
                                     onHoldingClick: (f) => setHoldingModal({ open: true, fund: f }),
@@ -4741,10 +5556,6 @@ export default function HomePage() {
                           if (!row || !row.code) return;
                           toggleFavorite(row.code);
                         }}
-                        onRemoveFromGroup={(row) => {
-                          if (!row || !row.code) return;
-                          removeFundFromCurrentGroup(row.code);
-                        }}
                         onHoldingAmountClick={(row, meta) => {
                           if (!row || !row.code) return;
                           const fund = row.rawFund || { code: row.code, name: row.fundName };
@@ -4759,6 +5570,23 @@ export default function HomePage() {
                           if (row.holdingProfitValue == null) return;
                           setPercentModes((prev) => ({ ...prev, [row.code]: !prev[row.code] }));
                         }}
+                        onBulkRemoveFundsConfirmed={(items) => {
+                          if (refreshing) return;
+                          fundDetailDrawerCloseRef.current?.();
+                          const gid =
+                            currentTab !== 'all' && currentTab !== 'fav' && groups.some((g) => g.id === currentTab)
+                              ? currentTab
+                              : null;
+                          const valid = (items || []).filter((x) => x?.code);
+                          if (valid.length === 0) return;
+                          const codes = valid.map((x) => x.code);
+                          if (gid) stripManyFundsFromGroupScope(codes, gid);
+                          else removeFundsBulk(codes);
+                          showToast(
+                            gid ? `已从当前分组移除 ${valid.length} 支基金` : `已删除 ${valid.length} 支基金`,
+                            'success'
+                          );
+                        }}
                         onCustomSettingsChange={triggerCustomSettingsSync}
                         getFundCardProps={(row) => {
                           const fund = row?.rawFund || (row ? { code: row.code, name: row.fundName } : null);
@@ -4768,20 +5596,20 @@ export default function HomePage() {
                             todayStr,
                             currentTab,
                             favorites,
-                            dcaPlans,
-                            holdings,
+                            dcaPlans: dcaPlansForTab,
+                            holdings: holdingsForTab,
                             percentModes,
                             todayPercentModes,
                             fundDailyEarnings,
                             valuationSeries,
                             collapsedCodes,
                             collapsedTrends,
-                            transactions,
+                            collapsedEarnings,
+                            transactions: transactionsForTab,
                             theme,
                             isTradingDay,
                             refreshing,
                             getHoldingProfit,
-                            onRemoveFromGroup: removeFundFromCurrentGroup,
                             onToggleFavorite: toggleFavorite,
                             onRemoveFund: requestRemoveFund,
                             onHoldingClick: (f) => setHoldingModal({ open: true, fund: f }),
@@ -4792,6 +5620,7 @@ export default function HomePage() {
                               setTodayPercentModes((prev) => ({ ...prev, [code]: !prev[code] })),
                             onToggleCollapse: toggleCollapse,
                             onToggleTrendCollapse: toggleTrendCollapse,
+                            onToggleEarningsCollapse: toggleEarningsCollapse,
                             masked: maskAmounts,
                             layoutMode: 'drawer',
                           };
@@ -4816,8 +5645,8 @@ export default function HomePage() {
                               todayStr={todayStr}
                               currentTab={currentTab}
                               favorites={favorites}
-                              dcaPlans={dcaPlans}
-                              holdings={holdings}
+                              dcaPlans={dcaPlansForTab}
+                              holdings={holdingsForTab}
                               percentModes={percentModes}
                               todayPercentModes={todayPercentModes}
                               fundDailyEarnings={fundDailyEarnings}
@@ -4825,12 +5654,11 @@ export default function HomePage() {
                               collapsedCodes={collapsedCodes}
                               collapsedTrends={collapsedTrends}
                               collapsedEarnings={collapsedEarnings}
-                              transactions={transactions}
+                              transactions={transactionsForTab}
                               theme={theme}
                               isTradingDay={isTradingDay}
                               refreshing={refreshing}
                               getHoldingProfit={getHoldingProfit}
-                              onRemoveFromGroup={removeFundFromCurrentGroup}
                               onToggleFavorite={toggleFavorite}
                               onRemoveFund={requestRemoveFund}
                               onHoldingClick={(fund) => setHoldingModal({ open: true, fund })}
@@ -4900,12 +5728,20 @@ export default function HomePage() {
         {fundDeleteConfirm && (
           <ConfirmModal
             title="删除确认"
-            message={`基金 "${fundDeleteConfirm.name}" 存在持仓记录。删除后将移除该基金及其持仓数据，是否继续？`}
+            message={
+              fundDeleteConfirm.scope === 'group'
+                ? `确定从当前分组中移除「${fundDeleteConfirm.name}」吗？将清除该分组内的持仓、待定交易、定投计划与分组内交易记录；不会在「全部」中删除该基金。`
+                : `基金 "${fundDeleteConfirm.name}" 存在持仓记录。删除后将从列表中移除该基金及其全部持仓与相关数据（含各分组内副本），是否继续？`
+            }
             confirmText="确定删除"
             onConfirm={() => {
               fundDetailDrawerCloseRef.current?.();
               fundDetailDialogCloseRef.current?.();
-              removeFund(fundDeleteConfirm.code);
+              if (fundDeleteConfirm.scope === 'group' && fundDeleteConfirm.groupId) {
+                stripFundFromGroupScope(fundDeleteConfirm.code, fundDeleteConfirm.groupId);
+              } else {
+                removeFund(fundDeleteConfirm.code);
+              }
               setFundDeleteConfirm(null);
             }}
             onCancel={() => setFundDeleteConfirm(null)}
@@ -5009,7 +5845,7 @@ export default function HomePage() {
           <AddFundToGroupModal
             allFunds={funds}
             currentGroupCodes={groups.find(g => g.id === currentTab)?.codes || []}
-            holdings={holdings}
+            holdings={holdingsForTab}
             onClose={() => setAddFundToGroupOpen(false)}
             onAdd={handleAddFundsToGroup}
           />
@@ -5022,8 +5858,13 @@ export default function HomePage() {
             fund={actionModal.fund}
             onClose={() => setActionModal({ open: false, fund: null })}
             onAction={(type) => handleAction(type, actionModal.fund)}
-            hasHistory={!!transactions[actionModal.fund?.code]?.length}
-            pendingCount={pendingTrades.filter(t => t.fundCode === actionModal.fund?.code).length}
+            hasHistory={!!(transactions[actionModal.fund?.code] || []).some((t) =>
+              !activeGroupId ? !t.groupId : t.groupId === activeGroupId
+            )}
+            pendingCount={pendingTrades.filter((t) =>
+              t.fundCode === actionModal.fund?.code &&
+              (!activeGroupId ? !t.groupId : t.groupId === activeGroupId)
+            ).length}
           />
         )}
       </AnimatePresence>
@@ -5033,7 +5874,7 @@ export default function HomePage() {
           <TradeModal
             type={tradeModal.type}
             fund={tradeModal.fund}
-            holding={holdings[tradeModal.fund?.code]}
+            holding={holdingsForTab[tradeModal.fund?.code]}
             onClose={() => setTradeModal({ open: false, fund: null, type: 'buy' })}
             onConfirm={(data) => handleTrade(tradeModal.fund, data)}
             pendingTrades={pendingTrades}
@@ -5053,7 +5894,7 @@ export default function HomePage() {
         {dcaModal.open && (
           <DcaModal
             fund={dcaModal.fund}
-            plan={dcaPlans[dcaModal.fund?.code]}
+            plan={dcaPlansForTab[dcaModal.fund?.code]}
             onClose={() => setDcaModal({ open: false, fund: null })}
             onConfirm={(config) => {
               const code = config?.fundCode || dcaModal.fund?.code;
@@ -5061,9 +5902,11 @@ export default function HomePage() {
                 setDcaModal({ open: false, fund: null });
                 return;
               }
-              setDcaPlans(prev => {
-                const next = { ...(prev || {}) };
-                next[code] = {
+              const scope = activeGroupId || DCA_SCOPE_GLOBAL;
+              setDcaPlans((prev) => {
+                const scoped = migrateDcaPlansToScoped(prev);
+                const bucket = { ...(isPlainObject(scoped[scope]) ? scoped[scope] : {}) };
+                bucket[code] = {
                   amount: config.amount,
                   feeRate: config.feeRate,
                   cycle: config.cycle,
@@ -5072,6 +5915,7 @@ export default function HomePage() {
                   monthlyDay: config.monthlyDay ?? null,
                   enabled: config.enabled !== false
                 };
+                const next = { ...scoped, [scope]: bucket };
                 storageHelper.setItem('dcaPlans', JSON.stringify(next));
                 return next;
               });
@@ -5096,8 +5940,13 @@ export default function HomePage() {
         {historyModal.open && (
           <TransactionHistoryModal
             fund={historyModal.fund}
-            transactions={transactions[historyModal.fund?.code] || []}
-            pendingTransactions={pendingTrades.filter(t => t.fundCode === historyModal.fund?.code)}
+            transactions={(transactions[historyModal.fund?.code] || []).filter((t) =>
+              !activeGroupId ? !t.groupId : t.groupId === activeGroupId
+            )}
+            pendingTransactions={pendingTrades.filter((t) =>
+              t.fundCode === historyModal.fund?.code &&
+              (!activeGroupId ? !t.groupId : t.groupId === activeGroupId)
+            )}
             onClose={() => setHistoryModal({ open: false, fund: null })}
             onDeleteTransaction={(id) => handleDeleteTransaction(historyModal.fund?.code, id)}
             onAddHistory={() => setAddHistoryModal({ open: true, fund: historyModal.fund })}
@@ -5129,7 +5978,7 @@ export default function HomePage() {
         {holdingModal.open && (
           <HoldingEditModal
             fund={holdingModal.fund}
-            holding={holdings[holdingModal.fund?.code]}
+            holding={holdingsForTab[holdingModal.fund?.code]}
             onClose={() => setHoldingModal({ open: false, fund: null })}
             onSave={(data) => handleSaveHolding(holdingModal.fund?.code, data)}
             onOpenTrade={() => {
