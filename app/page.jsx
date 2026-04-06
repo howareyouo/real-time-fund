@@ -3315,19 +3315,19 @@ export default function HomePage() {
           const subDays = (dateStr, days) => dayjs.tz(dateStr, TZ).subtract(days, 'day').format('YYYY-MM-DD');
 
           const calcEarningsFromNavs = (nav, prevNav, share) => (nav - prevNav) * share;
-          const calcRateFromNavs = (nav, prevNav) => {
-            if (!Number.isFinite(nav) || !Number.isFinite(prevNav) || prevNav <= 0) return null;
-            return ((nav - prevNav) / prevNav) * 100;
+          const calcRateFromNavs = (nav, prevNav, cost) => {
+            if (!Number.isFinite(nav) || !Number.isFinite(prevNav) || !Number.isFinite(cost) || cost <= 0) return null;
+            return ((nav - prevNav) / cost) * 100;
           };
 
-          const calcLatestDayFromFund = (u, share) => {
+          const calcLatestDayFromFund = (u, share, cost) => {
             const nav = Number(u?.dwjz);
             if (!Number.isFinite(nav) || nav <= 0) return null;
             const lastNav = u?.lastNav != null && u.lastNav !== '' ? Number(u.lastNav) : null;
             if (lastNav != null && Number.isFinite(lastNav) && lastNav > 0) {
               return {
                 earnings: calcEarningsFromNavs(nav, lastNav, share),
-                rate: calcRateFromNavs(nav, lastNav),
+                rate: calcRateFromNavs(nav, lastNav, cost),
               };
             }
             const zzl = u?.zzl != null && u.zzl !== '' ? Number(u.zzl) : Number.NaN;
@@ -3336,7 +3336,7 @@ export default function HomePage() {
               if (Number.isFinite(prev) && prev > 0) {
                 return {
                   earnings: calcEarningsFromNavs(nav, prev, share),
-                  rate: zzl,
+                  rate: calcRateFromNavs(nav, prev, cost),
                 };
               }
             }
@@ -3384,6 +3384,7 @@ export default function HomePage() {
             if (!code) continue;
             const h = holdingsForTab?.[code];
             const share = h?.share;
+            const cost = h?.cost;
             // 规则 1：基金存在持仓数据（只要求份额有效）
             if (!isNumber(share) || share <= 0) continue;
 
@@ -3396,7 +3397,7 @@ export default function HomePage() {
 
             // 规则 3：如果每日收益没有任何一条数据，则仅需记录最新的净值的收益数据
             if (!existing.length) {
-              const v = calcLatestDayFromFund(u, share);
+              const v = calcLatestDayFromFund(u, share, cost);
               if (v && Number.isFinite(v.earnings)) {
                 const list = recordDailyEarnings(code, v.earnings, latestNavDate, v.rate, dailyEarningsScope);
                 nextDailyMap[code] = list;
@@ -3411,7 +3412,7 @@ export default function HomePage() {
                     const prevNav = await findPrevTradingNav(code, latestNavDate, navCache, u);
                     if (Number.isFinite(prevNav) && prevNav > 0) {
                       const earnings = calcEarningsFromNavs(nav, prevNav, share);
-                      const rate = calcRateFromNavs(nav, prevNav);
+                      const rate = calcRateFromNavs(nav, prevNav, cost);
                       if (Number.isFinite(earnings)) {
                         const list = recordDailyEarnings(code, earnings, latestNavDate, rate, dailyEarningsScope);
                         nextDailyMap[code] = list;
@@ -3453,7 +3454,7 @@ export default function HomePage() {
               if (!Number.isFinite(nav) || nav <= 0) continue;
 
               const earnings = calcEarningsFromNavs(nav, prevNav, share);
-              const rate = calcRateFromNavs(nav, prevNav);
+              const rate = calcRateFromNavs(nav, prevNav, cost);
               if (Number.isFinite(earnings)) {
                 const list = recordDailyEarnings(code, earnings, cursor, rate, dailyEarningsScope);
                 nextDailyMap[code] = list;

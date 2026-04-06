@@ -8,7 +8,7 @@
  * - scope: 'all'（全局）或自定义分组 id
  * - date: YYYY-MM-DD
  * - earnings: 当日收益（元）
- * - rate: 当日收益率（百分比数值，如 1.23 表示 +1.23%），可选
+ * - rate: 当日收益率（百分比数值，如 1.23 表示 +1.23%），基于用户成本价计算，即 (当日收益 / 成本金额) × 100
  */
 import { isPlainObject, isString, isNumber } from 'lodash';
 
