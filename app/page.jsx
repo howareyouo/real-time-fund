@@ -579,6 +579,8 @@ export default function HomePage() {
   }, []);
 
   const [mobileMainTab, setMobileMainTab] = useState('home');
+  const [mobileBottomNavHidden, setMobileBottomNavHidden] = useState(false);
+  const lastScrollYRef = useRef(0);
   const [portfolioEarningsOpen, setPortfolioEarningsOpen] = useState(false);
   const [mobileFundDrawerOpen, setMobileFundDrawerOpen] = useState(false);
   const [mobileTableSettingModalOpen, setMobileTableSettingModalOpen] = useState(false);
@@ -1125,18 +1127,13 @@ export default function HomePage() {
   // 自动滚动选中 Tab 到可视区域
   useEffect(() => {
     if (!tabsRef.current) return;
-    const container = tabsRef.current;
     if (currentTab === 'all') {
-      container.scrollTo({ left: 0, behavior: 'smooth' });
+      tabsRef.current.scrollTo({ left: 0, behavior: 'smooth' });
       return;
     }
-    const activeTab = container.querySelector('.tab.active');
+    const activeTab = tabsRef.current.querySelector('.tab.active');
     if (activeTab) {
-      // 手动计算滚动位置，避免 scrollIntoView 导致页面垂直滚动
-      const containerRect = container.getBoundingClientRect();
-      const tabRect = activeTab.getBoundingClientRect();
-      const scrollLeft = container.scrollLeft + (tabRect.left - containerRect.left) - (container.clientWidth / 2) + (tabRect.width / 2);
-      container.scrollTo({ left: Math.max(0, scrollLeft), behavior: 'smooth' });
+      activeTab.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
     }
   }, [currentTab]);
 
@@ -5057,6 +5054,43 @@ export default function HomePage() {
   }, [isAnyModalOpen]);
 
   useEffect(() => {
+    if (!isMobile || mobileMainTab !== 'home' || isAnyModalOpen) return;
+
+    let ticking = false;
+    const handleScroll = () => {
+      if (!ticking) {
+        requestAnimationFrame(() => {
+          const currentScrollY = window.scrollY;
+          const lastScrollY = lastScrollYRef.current;
+          const scrollDelta = currentScrollY - lastScrollY;
+          const threshold = 10;
+
+          if (scrollDelta > threshold && currentScrollY > 50) {
+            setMobileBottomNavHidden(true);
+          } else if (scrollDelta < -threshold) {
+            setMobileBottomNavHidden(false);
+          } else if (currentScrollY <= 0) {
+            setMobileBottomNavHidden(false);
+          }
+
+          lastScrollYRef.current = currentScrollY;
+          ticking = false;
+        });
+        ticking = true;
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [isMobile, mobileMainTab, isAnyModalOpen]);
+
+  useEffect(() => {
+    if (!isMobile || mobileMainTab !== 'home') {
+      setMobileBottomNavHidden(false);
+    }
+  }, [isMobile, mobileMainTab]);
+
+  useEffect(() => {
     const onKey = (ev) => {
       if (ev.key === 'Escape' && settingsOpen) setSettingsOpen(false);
     };
@@ -6095,7 +6129,7 @@ export default function HomePage() {
         />
       )}
       {isMobile && !isAnyModalOpen && (
-        <MobileBottomNav value={mobileMainTab} onChange={setMobileMainTab} />
+        <MobileBottomNav value={mobileMainTab} onChange={setMobileMainTab} hidden={mobileBottomNavHidden && mobileMainTab === 'home'} />
       )}
 
       <AnimatePresence>
