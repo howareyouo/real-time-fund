@@ -71,12 +71,17 @@ const CHART_COLORS = {
       'rgba(71,85,105,0.45)',
       'rgba(249,115,22,0.5)',
       'rgba(15,23,42,0.35)',
-    ],
+    ]
   }
 };
 
 function getChartThemeColors(theme) {
   return CHART_COLORS[theme] || CHART_COLORS.dark;
+}
+
+function formatPercentage(value) {
+  if (typeof value !== 'number') return value;
+  return (value >= 0 ? '+' : '') + value.toFixed(2) + '%';
 }
 
 export default function FundTrendChart({ code, isExpanded, onToggleExpand, transactions = [], theme = 'dark', hideHeader = false }) {
@@ -156,6 +161,16 @@ export default function FundTrendChart({ code, isExpanded, onToggleExpand, trans
     return data.map(d => ((d.value - firstValue) / firstValue) * 100);
   }, [data]);
 
+  const dailyChangeData = useMemo(() => {
+    if (!data.length) return [];
+    return data.map((d, idx) => {
+      if (idx === 0) return 0;
+      const prevValue = data[idx - 1]?.value;
+      const currentValue = d?.value;
+      return ((currentValue - prevValue) / prevValue) * 100;
+    });
+  }, [data]);
+
   const chartData = useMemo(() => {
     // Data_grandTotal：在 fetchFundHistory 中解析为 data.grandTotalSeries 数组
     const grandTotalSeries = Array.isArray(data.grandTotalSeries) ? data.grandTotalSeries : [];
@@ -219,7 +234,7 @@ export default function FundTrendChart({ code, isExpanded, onToggleExpand, trans
         pointRadius: 0,
         pointHoverRadius: 3,
         fill: false,
-        tension: 0.2,
+        tension: 0.1,
         order: 2,
       };
     });
@@ -243,7 +258,7 @@ export default function FundTrendChart({ code, isExpanded, onToggleExpand, trans
           pointRadius: 0,
           pointHoverRadius: 4,
           fill: true,
-          tension: 0.2,
+          tension: 0.1,
           order: 2
         },
         ...(['1y', '3y', 'all'].includes(range) ? [] : grandDatasets),
@@ -279,7 +294,7 @@ export default function FundTrendChart({ code, isExpanded, onToggleExpand, trans
     };
   }, [data, transactions, lineColor, primaryColor, upColor, chartColors, theme, hiddenGrandSeries, percentageData, range]);
 
-  const options = useMemo(() => {
+const options = useMemo(() => {
     const colors = getChartThemeColors(theme);
     return {
       responsive: true,
@@ -597,6 +612,12 @@ export default function FundTrendChart({ code, isExpanded, onToggleExpand, trans
 
   const lastIndex = data.length > 0 ? data.length - 1 : null;
   const currentIndex = activeIndex != null && activeIndex < data.length ? activeIndex : lastIndex;
+  const dailyChange = currentIndex != null ? dailyChangeData[currentIndex] : 0
+  const dailyChangeColor = dailyChange == 0
+    ? chartColors.muted
+    : dailyChange >= 0
+      ? upColor
+      : downColor;
 
   const chartBlock = (
     <>
@@ -618,15 +639,22 @@ export default function FundTrendChart({ code, isExpanded, onToggleExpand, trans
             <span className="muted">本基金</span>
           </div>
           {currentIndex != null && percentageData[currentIndex] !== undefined && (
-            <span
+            <span 
               className="muted"
               style={{
                 fontSize: 10,
                 fontVariantNumeric: 'tabular-nums',
                 paddingLeft: 14,
+              }}>
+            <a>{formatPercentage(percentageData[currentIndex])}</a>
+            <a
+              style={{
+                paddingLeft: 10,
+                color: dailyChangeColor,
               }}
             >
-              {percentageData[currentIndex].toFixed(2)}%
+              {formatPercentage(dailyChange)}
+            </a>
             </span>
           )}
         </div>
@@ -675,7 +703,7 @@ export default function FundTrendChart({ code, isExpanded, onToggleExpand, trans
 
               if (baseValue != null && typeof rawPoint === 'number' && Number.isFinite(rawPoint)) {
                 const normalized = rawPoint - baseValue;
-                valueText = `${normalized.toFixed(2)}%`;
+                valueText = formatPercentage(normalized);
               }
             }
             return (
@@ -765,7 +793,7 @@ export default function FundTrendChart({ code, isExpanded, onToggleExpand, trans
           })}
       </div>
 
-      <div style={{ position: 'relative', height: 180, width: '100%', touchAction: 'pan-y' }}>
+      <div style={{ position: 'relative', height: 300, width: '100%', touchAction: 'pan-y' }}>
         {loading && (
           <div className="chart-overlay" style={{ backdropFilter: 'blur(2px)' }}>
             <span className="muted" style={{ fontSize: '12px' }}>加载中...</span>
@@ -825,7 +853,7 @@ export default function FundTrendChart({ code, isExpanded, onToggleExpand, trans
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <span className="muted">{ranges.find(r => r.value === range)?.label}涨跌幅</span>
                 <span style={{ color: lineColor, fontWeight: 600 }}>
-                  {change > 0 ? '+' : ''}{change.toFixed(2)}%
+                  {formatPercentage(change)}
                 </span>
               </div>
             )}
@@ -836,9 +864,9 @@ export default function FundTrendChart({ code, isExpanded, onToggleExpand, trans
       {hideHeader && data.length > 0 && (
         <div className="row" style={{ marginBottom: 8, justifyContent: 'flex-end' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span className="muted">{ranges.find(r => r.value === range)?.label}涨跌幅</span>
+            <span className="muted text-sm">{ranges.find(r => r.value === range)?.label}涨跌幅</span>
             <span style={{ color: lineColor, fontWeight: 600 }}>
-              {change > 0 ? '+' : ''}{change.toFixed(2)}%
+              {formatPercentage(change)}
             </span>
           </div>
         </div>
