@@ -764,7 +764,7 @@ export default function PcFundTable({
             className={`name-text ${showFullFundName ? 'show-full' : ''}`}
             title={isUpdated ? '今日净值已更新' : ''}
           >
-            {info.getValue() ?? '—'}
+            {info.getValue() ?? '--'}
           </span>
           {code ? <span className="muted code-text">
             #{code}
@@ -825,7 +825,7 @@ export default function PcFundTable({
           const original = info.row.original || {};
           const code = original.code;
           const value = (code && (relatedSectorByCode?.[code] ?? relatedSectorCacheRef.current.get(code))) || '';
-          const display = value || '—';
+          const display = value || '--';
           const labelKey = value ? String(value).trim() : '';
           const quote = labelKey ? sectorQuoteByLabel?.[labelKey] : null;
           const nameFromQuote = quote?.name != null ? String(quote.name).trim() : '';
@@ -845,7 +845,7 @@ export default function PcFundTable({
               }}
             >
               <span
-                title={firstLine !== '—' ? firstLine : undefined}
+                title={firstLine !== '--' ? firstLine : undefined}
                 style={{
                   display: 'block',
                   width: '100%',
@@ -886,7 +886,7 @@ export default function PcFundTable({
           const cls = value > 0 ? 'up' : value < 0 ? 'down' : '';
           const text = value != null && Number.isFinite(value)
             ? `${value > 0 ? '+' : ''}${value.toFixed(2)}%`
-            : '—';
+            : '--';
           return (
             <div style={{ textAlign: 'right' }}>
               <FitText className={cls} style={{ fontWeight: 700 }} maxFontSize={14} minFontSize={10} as="div">
@@ -908,7 +908,7 @@ export default function PcFundTable({
           const cls = value > 0 ? 'up' : value < 0 ? 'down' : '';
           const text = value != null && Number.isFinite(value)
             ? `${value > 0 ? '+' : ''}${value.toFixed(2)}%`
-            : '—';
+            : '--';
           return (
             <div style={{ textAlign: 'right' }}>
               <FitText className={cls} style={{ fontWeight: 700 }} maxFontSize={14} minFontSize={10} as="div">
@@ -930,7 +930,7 @@ export default function PcFundTable({
           const cls = value > 0 ? 'up' : value < 0 ? 'down' : '';
           const text = value != null && Number.isFinite(value)
             ? `${value > 0 ? '+' : ''}${value.toFixed(2)}%`
-            : '—';
+            : '--';
           return (
             <div style={{ textAlign: 'right' }}>
               <FitText className={cls} style={{ fontWeight: 700 }} maxFontSize={14} minFontSize={10} as="div">
@@ -952,7 +952,7 @@ export default function PcFundTable({
           const cls = value > 0 ? 'up' : value < 0 ? 'down' : '';
           const text = value != null && Number.isFinite(value)
             ? `${value > 0 ? '+' : ''}${value.toFixed(2)}%`
-            : '—';
+            : '--';
           return (
             <div style={{ textAlign: 'right' }}>
               <FitText className={cls} style={{ fontWeight: 700 }} maxFontSize={14} minFontSize={10} as="div">
@@ -974,7 +974,7 @@ export default function PcFundTable({
           const cls = value > 0 ? 'up' : value < 0 ? 'down' : '';
           const text = value != null && Number.isFinite(value)
             ? `${value > 0 ? '+' : ''}${value.toFixed(2)}%`
-            : '—';
+            : '--';
           return (
             <div style={{ textAlign: 'right' }}>
               <FitText className={cls} style={{ fontWeight: 700 }} maxFontSize={14} minFontSize={10} as="div">
@@ -996,7 +996,7 @@ export default function PcFundTable({
           return (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 0 }}>
               <FitText style={{ fontWeight: 700 }} maxFontSize={14} minFontSize={10} as="div">
-                {info.getValue() ?? '—'}
+                {info.getValue() ?? '--'}
               </FitText>
               <span className="muted" style={{ fontSize: '11px' }}>
                 {date}
@@ -1018,11 +1018,11 @@ export default function PcFundTable({
           const rawDate = original.estimateNavDate ?? '-';
           const date = typeof rawDate === 'string' && rawDate.length > 5 ? rawDate.slice(5) : rawDate;
           const estimateNav = info.getValue();
-          const hasEstimateNav = estimateNav != null && estimateNav !== '—';
+          const hasEstimateNav = estimateNav != null && estimateNav !== '--';
           return (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 0 }}>
               <FitText style={{ fontWeight: 700 }} maxFontSize={14} minFontSize={10} as="div">
-                {estimateNav ?? '—'}
+                {estimateNav ?? '--'}
               </FitText>
               {hasEstimateNav && date && date !== '-' ? (
                 <span className="muted" style={{ fontSize: '11px' }}>
@@ -1050,7 +1050,7 @@ export default function PcFundTable({
           return (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 0 }}>
               <FitText className={cls} style={{ fontWeight: 700 }} maxFontSize={14} minFontSize={10} as="div">
-                {info.getValue() ?? '—'}
+                {info.getValue() ?? '--'}
               </FitText>
               <span className="muted" style={{ fontSize: '11px' }}>
                 {date}
@@ -1075,11 +1075,11 @@ export default function PcFundTable({
           const time = typeof rawTime === 'string' && rawTime.length > 5 ? rawTime.slice(5) : rawTime;
           const cls = isMuted ? 'muted' : value > 0 ? 'up' : value < 0 ? 'down' : '';
           const text = info.getValue();
-          const hasText = text != null && text !== '—';
+          const hasText = text != null && text !== '--';
           return (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 0 }}>
               <FitText className={cls} style={{ fontWeight: 700 }} maxFontSize={14} minFontSize={10} as="div">
-                {text ?? '—'}
+                {text ?? '--'}
               </FitText>
               {hasText && time && time !== '-' ? (
                 <span className="muted" style={{ fontSize: '11px' }}>
@@ -1103,7 +1103,7 @@ export default function PcFundTable({
           const value = original.estimateProfitValue;
           const hasProfit = value != null;
           const cls = hasProfit ? (value > 0 ? 'up' : value < 0 ? 'down' : '') : 'muted';
-          const amountStr = hasProfit ? (original.estimateProfit ?? '') : '—';
+          const amountStr = hasProfit ? (original.estimateProfit ?? '') : '--';
           const percentStr = original.estimateProfitPercent ?? '';
 
           return (
@@ -1166,7 +1166,7 @@ export default function PcFundTable({
             >
               <div style={{ flex: '1 1 0', minWidth: 0 }}>
                 <FitText style={{ fontWeight: 700 }} maxFontSize={14} minFontSize={10}>
-                  {masked ? <span className="mask-text">******</span> : (info.getValue() ?? '—')}
+                  {masked ? <span className="mask-text">******</span> : (info.getValue() ?? '--')}
                 </FitText>
               </div>
               <button
@@ -1196,7 +1196,7 @@ export default function PcFundTable({
           const original = info.row.original || {};
           const value = original.holdingDaysValue;
           if (value == null) {
-            return <div className="muted" style={{ textAlign: 'right', fontSize: '12px' }}>—</div>;
+            return <div className="muted" style={{ textAlign: 'right', fontSize: '12px' }}>--</div>;
           }
           return (
             <div style={{ fontWeight: 700, textAlign: 'right' }}>
@@ -1218,7 +1218,7 @@ export default function PcFundTable({
           const value = original.todayProfitValue;
           const hasProfit = value != null;
           const cls = hasProfit ? (value > 0 ? 'up' : value < 0 ? 'down' : '') : 'muted';
-          const amountStr = hasProfit ? (info.getValue() ?? '') : '—';
+          const amountStr = hasProfit ? (info.getValue() ?? '') : '--';
           const percentStr = original.todayProfitPercent ?? '';
           const isUpdated = original.isUpdated;
           return (
@@ -1250,7 +1250,7 @@ export default function PcFundTable({
           const value = original.yesterdayProfitValue;
           const hasProfit = value != null;
           const cls = hasProfit ? (value > 0 ? 'up' : value < 0 ? 'down' : '') : 'muted';
-          const amountStr = hasProfit ? (info.getValue() ?? '') : '—';
+          const amountStr = hasProfit ? (info.getValue() ?? '') : '--';
           const percentStr = original.yesterdayProfitPercent ?? '';
           const pctVal = original.yesterdaySecondLinePctValue;
           const pctCls = pctVal != null && Number.isFinite(pctVal)
@@ -1285,7 +1285,7 @@ export default function PcFundTable({
           const value = original.holdingProfitValue;
           const hasTotal = value != null;
           const cls = hasTotal ? (value > 0 ? 'up' : value < 0 ? 'down' : '') : 'muted';
-          const amountStr = hasTotal ? (info.getValue() ?? '') : '—';
+          const amountStr = hasTotal ? (info.getValue() ?? '') : '--';
           const percentStr = original.holdingProfitPercent ?? '';
           return (
             <div style={{ width: '100%' }}>
@@ -1406,7 +1406,7 @@ export default function PcFundTable({
     },
     getCoreRowModel: getCoreRowModel(),
     defaultColumn: {
-      cell: (info) => info.getValue() ?? '—',
+      cell: (info) => info.getValue() ?? '--',
     },
   });
 
