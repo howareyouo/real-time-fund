@@ -26,9 +26,10 @@ export default function RootLayout({ children }) {
       <meta name="theme-color" content="#0f172a" />
       <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
       {/* 尽早设置 data-theme，减少首屏主题闪烁；与 suppressHydrationWarning 配合避免服务端/客户端 html 属性不一致报错 */}
+      {/* 动态主题加载：先检查 localStorage，light 主题会动态加载 theme-light.css */}
       <script
         dangerouslySetInnerHTML={{
-          __html: `(function(){try{var t=localStorage.getItem("theme");if(t==="light"||t==="dark")document.documentElement.setAttribute("data-theme",t);}catch(e){}})();`,
+          __html: `(function(){try{var t=localStorage.getItem("theme");if(t==="light"){document.documentElement.setAttribute("data-theme","light");var l=document.createElement("link");l.rel="stylesheet";l.href="/theme-light.css";document.head.appendChild(l);}else{document.documentElement.setAttribute("data-theme","dark");}}catch(e){document.documentElement.setAttribute("data-theme","dark");}})();`,
         }}
       />
     </head>

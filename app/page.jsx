@@ -72,6 +72,7 @@ import packageJson from '../package.json';
 import PcFundTable from './components/PcFundTable';
 import MyEarningsCalendarPage from './components/MyEarningsCalendarPage';
 import { useFundFuzzyMatcher } from './hooks/useFundFuzzyMatcher';
+import { useThemeLoader } from './hooks/useThemeLoader';
 import {
   Select,
   SelectContent,
@@ -469,6 +470,9 @@ export default function HomePage() {
   const [theme, setTheme] = useState('dark');
   const [showThemeTransition, setShowThemeTransition] = useState(false);
 
+  // 使用动态主题加载 hook
+  useThemeLoader(theme);
+
   const handleThemeToggle = useCallback(() => {
     setTheme((t) => (t === 'dark' ? 'light' : 'dark'));
     setShowThemeTransition(true);
@@ -485,7 +489,6 @@ export default function HomePage() {
       const fromStorage = localStorage.getItem('theme');
       if (fromStorage === 'light' || fromStorage === 'dark') {
         setTheme(fromStorage);
-        document.documentElement.setAttribute('data-theme', fromStorage);
       }
     } catch { }
   }, []);
@@ -2805,9 +2808,8 @@ export default function HomePage() {
     } catch { }
   }, [currentTab]);
 
-  // 主题同步到 document 并持久化
+  // 主题持久化到 localStorage（data-theme 和 CSS 加载由 useThemeLoader 处理）
   useEffect(() => {
-    document.documentElement.setAttribute('data-theme', theme);
     try {
       localStorage.setItem('theme', theme);
     } catch { }
