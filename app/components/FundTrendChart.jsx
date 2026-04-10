@@ -254,7 +254,7 @@ export default function FundTrendChart({ code, isExpanded, onToggleExpand, trans
             gradient.addColorStop(1, `${lineColor}00`); // 0% opacity
             return gradient;
           },
-          borderWidth: 2,
+          borderWidth: 1.5,
           pointRadius: 0,
           pointHoverRadius: 4,
           fill: true,

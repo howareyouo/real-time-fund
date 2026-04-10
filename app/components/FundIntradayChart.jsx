@@ -86,11 +86,11 @@ export default function FundIntradayChart({ series = [], referenceNav, theme = '
             gradient.addColorStop(1, lineColor + '00');
             return gradient;
           },
-          borderWidth: 2,
+          borderWidth: 1.5,
           pointRadius: series.length <= 2 ? 3 : 0,
           pointHoverRadius: 4,
           fill: true,
-          tension: 0.2
+          tension: 0.1
         }
       ]
     };
