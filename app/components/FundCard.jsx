@@ -110,8 +110,6 @@ export default function FundCard({
   const style = layoutMode === 'drawer' ? {
     border: 'none',
     boxShadow: 'none',
-    paddingLeft: 0,
-    paddingRight: 0,
     background: theme === 'light'  ? 'rgb(250,250,250)' : 'none',
   } : {};
 
