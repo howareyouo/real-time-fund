@@ -30,7 +30,7 @@ import { CloseIcon, MinusIcon, ResetIcon, SettingsIcon } from "./Icons";
 import ConfirmModal from "./ConfirmModal";
 import { cn } from "@/lib/utils";
 
-function SortableIndexItem({ item, canRemove, onRemove, isMobile }) {
+function SortableIndexItem({ item, canRemove, onRemove }) {
   const {
     attributes,
     listeners,
@@ -44,9 +44,7 @@ function SortableIndexItem({ item, canRemove, onRemove, isMobile }) {
     transform: CSS.Transform.toString(transform),
     transition,
     cursor: isDragging ? "grabbing" : "grab",
-    flex: isMobile
-      ? "0 0 calc((100% - 24px) / 3)"
-      : "0 0 calc((100% - 48px) / 5)",
+    flex:"0 0 calc((100% - 48px) / 5)",
     touchAction: "none",
     ...(isDragging && {
       position: "relative",
@@ -129,7 +127,6 @@ function SortableIndexItem({ item, canRemove, onRemove, isMobile }) {
  * @param {Object} props
  * @param {boolean} props.open - 是否打开
  * @param {() => void} props.onClose - 关闭回调
- * @param {boolean} props.isMobile - 是否为移动端（由上层传入）
  * @param {Array<{code:string,name:string,price:number,change:number,changePercent:number}>} props.indices - 当前可用的大盘指数列表
  * @param {string[]} props.selectedCodes - 已选中的指数 code，决定展示顺序
  * @param {(codes: string[]) => void} props.onChangeSelected - 更新选中指数集合
@@ -138,7 +135,6 @@ function SortableIndexItem({ item, canRemove, onRemove, isMobile }) {
 export default function MarketSettingModal({
   open,
   onClose,
-  isMobile,
   indices = [],
   selectedCodes = [],
   onChangeSelected,
@@ -253,7 +249,6 @@ export default function MarketSettingModal({
                     item={item}
                     canRemove={selectedCodes.length > 1}
                     onRemove={handleToggleCode}
-                    isMobile={isMobile}
                   />
                 ))}
               </div>
@@ -339,66 +334,6 @@ export default function MarketSettingModal({
   );
 
   if (!open) return null;
-
-  if (isMobile) {
-    return (
-      <Drawer
-        open={open}
-        onOpenChange={(v) => {
-          if (!v) onClose?.();
-        }}
-        direction="bottom"
-      >
-        <DrawerContent
-          className="glass"
-          defaultHeight="77vh"
-          minHeight="40vh"
-          maxHeight="90vh"
-        >
-          <DrawerHeader className="flex flex-row items-center justify-between gap-2 py-4">
-            <DrawerTitle className="flex items-center gap-2.5 text-left">
-              <SettingsIcon width="20" height="20" />
-              <span>指数个性化设置</span>
-            </DrawerTitle>
-            <DrawerClose
-              className="icon-button border-none bg-transparent p-1"
-              title="关闭"
-              style={{
-                borderColor: "transparent",
-                backgroundColor: "transparent",
-              }}
-            >
-              <CloseIcon width="20" height="20" />
-            </DrawerClose>
-          </DrawerHeader>
-          <div className="flex-1 overflow-y-auto">{body}</div>
-        </DrawerContent>
-        <AnimatePresence>
-          {resetConfirmOpen && (
-            <ConfirmModal
-              key="mobile-index-reset-confirm"
-              title="恢复默认指数"
-              message="是否恢复已添加指数为默认配置？"
-              icon={
-                <ResetIcon
-                  width="20"
-                  height="20"
-                  className="shrink-0 text-[var(--primary)]"
-                />
-              }
-              confirmVariant="primary"
-              confirmText="恢复默认"
-              onConfirm={() => {
-                onResetDefault?.();
-                setResetConfirmOpen(false);
-              }}
-              onCancel={() => setResetConfirmOpen(false)}
-            />
-          )}
-        </AnimatePresence>
-      </Drawer>
-    );
-  }
 
   const pcContent = (
     <AnimatePresence>

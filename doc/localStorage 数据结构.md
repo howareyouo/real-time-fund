@@ -350,7 +350,6 @@
   localSortDisplayMode: string,  // 排序显示模式 'buttons' | 'dropdown'
   pcContainerWidth: number,      // PC端容器宽度（桌面版）
   showMarketIndexPc: boolean,    // PC端是否显示大盘指数
-  showMarketIndexMobile: boolean, // 移动端是否显示大盘指数
   marketIndexSelected: Array<string>,  // 选中的市场指数代码
   // ... 其他自定义设置
 }
@@ -747,7 +746,6 @@ const storageHelper = {
 - `app/page.jsx` - 主要页面组件，包含所有 localStorage 操作
 - `app/components/Announcement.jsx` - 公告组件
 - `app/components/PcFundTable.jsx` - PC端基金表格组件
-- `app/components/MobileFundTable.jsx` - 移动端基金表格组件
 - `app/components/MarketIndexAccordion.jsx` - 市场指数组件
 - `app/lib/supabase.js` - Supabase 客户端配置
 - `app/lib/valuationTimeseries.js` - 估值分时数据管理

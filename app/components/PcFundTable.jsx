@@ -104,7 +104,7 @@ function SortableRow({ row, children, isTableDragging, disabled }) {
 
   return (
     <SortableRowContext.Provider value={contextValue}>
-      <motion.div
+      <div
         ref={setNodeRef}
         className="table-row-wrapper"
         layout={isTableDragging ? undefined : "position"}
@@ -116,7 +116,7 @@ function SortableRow({ row, children, isTableDragging, disabled }) {
         {...attributes}
       >
         {children}
-      </motion.div>
+      </div>
     </SortableRowContext.Provider>
   );
 }

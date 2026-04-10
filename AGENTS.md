@@ -47,7 +47,6 @@ real-time-fund/
 | Main UI orchestration | `app/page.jsx` | Monolithic — all useState, business logic, rendering |
 | Fund card display | `app/components/FundCard.jsx` | Individual fund card with holdings |
 | Desktop table | `app/components/PcFundTable.jsx` | PC-specific table layout |
-| Mobile table | `app/components/MobileFundTable.jsx` | Mobile-specific layout, swipe actions |
 | Holding calculations | `app/page.jsx` (getHoldingProfit) | Profit/loss computation |
 | Cloud sync | `app/lib/supabase.js` + page.jsx sync functions | Supabase auth + data sync |
 | Trading/DCA | `app/components/TradeModal.jsx`, `DcaModal.jsx` | Buy/sell, dollar-cost averaging |
@@ -71,7 +70,6 @@ real-time-fund/
 - **JSONP + script injection** — all external API calls bypass CORS via `<script>` tags, not fetch().
 - **localStorage-first** — all user data stored locally; Supabase sync is optional/secondary.
 - **Monolithic page.jsx** — entire app state and logic in one file (~3000+ lines). No state management library.
-- **Dual responsive layouts** — `PcFundTable` and `MobileFundTable` switch at 640px breakpoint.
 - **shadcn/ui conventions** — new-york style, CSS variables enabled, Lucide icons, path aliases (`@/components`, `@/lib/utils`).
 - **Linting only** — ESLint + lint-staged on pre-commit. No Prettier, no auto-formatting.
 - **React Compiler** — `reactCompiler: true` in next.config.js (experimental auto-memoization).
@@ -82,7 +80,6 @@ real-time-fund/
 - **Dual ESLint configs** — both `.eslintrc.json` (legacy) and `eslint.config.mjs` (flat) exist. Flat config is active.
 - **`--legacy-peer-deps`** — Dockerfile uses this flag, indicating peer dependency conflicts.
 - **Console statements** — 20 console.error/warn/log across codebase (mostly error logging in page.jsx).
-- **2 eslint-disable comments** — `no-await-in-loop` in MobileFundTable, `react-hooks/exhaustive-deps` in HoldingEditModal.
 - **Hardcoded API keys** — `app/api/fund.js` lines 911-914 contain plaintext API keys for LLM service.
 - **Empty catch blocks** — several `catch (e) {}` blocks that swallow errors silently.
 

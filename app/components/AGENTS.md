@@ -11,14 +11,12 @@ app/components/
 ├── Core Display (6)
 │   ├── FundCard.jsx            # Individual fund card (valuation + holdings)
 │   ├── PcFundTable.jsx         # Desktop table layout
-│   ├── MobileFundTable.jsx     # Mobile list with swipe actions
-│   ├── MobileFundCardDrawer.jsx# Mobile fund detail drawer
 │   ├── GroupSummary.jsx        # Group portfolio summary
 │   └── MarketIndexAccordion.jsx# Market indices (24 A/HK/US)
 ├── Modals (26)
 │   ├── Fund ops: AddFundToGroupModal, GroupManageModal, GroupModal, AddResultModal
 │   ├── Trading: TradeModal, HoldingEditModal, HoldingActionModal, TransactionHistoryModal, PendingTradesModal, DcaModal, AddHistoryModal
-│   ├── Settings: SettingsModal, MarketSettingModal, MobileSettingModal, PcTableSettingModal, SortSettingModal
+│   ├── Settings: SettingsModal, MarketSettingModal, PcTableSettingModal, SortSettingModal
 │   ├── Auth: LoginModal, CloudConfigModal
 │   ├── Scan: ScanPickModal, ScanProgressModal, ScanImportConfirmModal, ScanImportProgressModal
 │   └── Misc: ConfirmModal, SuccessModal, DonateModal, FeedbackModal, WeChatModal, UpdatePromptModal, FundHistoryNetValueModal
@@ -43,7 +41,6 @@ app/components/
 - **All client components** — `'use client'` at top, no server components
 - **State from parent** — page.jsx manages ALL state; components receive props only
 - **shadcn/ui primitives** — imported from `@/components/ui/*`
-- **Mobile/Desktop switching** — parent passes `isMobile` prop; 640px breakpoint
 - **Modals**: use `useBodyScrollLock(open)` hook for scroll prevention
 - **Icons**: mix of custom SVG (Icons.jsx) + lucide-react
 - **Styling**: glassmorphism via CSS variables (globals.css), no component-level CSS

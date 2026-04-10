@@ -8,7 +8,6 @@ import githubImg from "../assets/github.svg";
 
 export default function LoginModal({
   onClose,
-  isMobile,
   loginEmail,
   setLoginEmail,
   loginOtp,
@@ -41,7 +40,7 @@ export default function LoginModal({
 
   // 发送成功后尝试自动聚焦；若系统仍不弹键盘，用户轻点验证码区会由 onPointerDownCapture 再 focus
   useLayoutEffect(() => {
-    if (!loginSuccess || !isMobile) return;
+    if (!loginSuccess) return;
     const run = () => focusOtpInput();
     run();
     const t = requestAnimationFrame(run);
@@ -50,7 +49,7 @@ export default function LoginModal({
       cancelAnimationFrame(t);
       window.clearTimeout(t2);
     };
-  }, [loginSuccess, isMobile, focusOtpInput]);
+  }, [loginSuccess, focusOtpInput]);
   return (
     <div
       className="modal-overlay"
@@ -97,9 +96,6 @@ export default function LoginModal({
               ref={otpTouchWrapRef}
               className="form-group"
               style={{ marginBottom: 16, touchAction: 'manipulation' }}
-              onPointerDownCapture={
-                isMobile ? () => focusOtpInput() : undefined
-              }
             >
               <div className="muted" style={{ marginBottom: 8, fontSize: '0.8rem' }}>
                 请输入邮箱验证码以完成注册/登录
@@ -109,9 +105,9 @@ export default function LoginModal({
                 value={loginOtp}
                 onChange={(value) => setLoginOtp(value)}
                 disabled={loginLoading}
-                autoFocus={!!isMobile}
+                autoFocus={true}
                 autoComplete="one-time-code"
-                type={isMobile ? 'tel' : 'text'}
+                type={'tel'}
                 enterKeyHint="done"
               >
                 <InputOTPGroup>

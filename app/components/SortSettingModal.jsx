@@ -23,14 +23,12 @@ import ConfirmModal from "./ConfirmModal";
  * @param {Object} props
  * @param {boolean} props.open - 是否打开
  * @param {() => void} props.onClose - 关闭回调
- * @param {boolean} props.isMobile - 是否为移动端（由上层传入）
  * @param {Array<{id: string, label: string, enabled: boolean}>} props.rules - 排序规则列表
  * @param {(nextRules: Array<{id: string, label: string, enabled: boolean}>) => void} props.onChangeRules - 规则变更回调
  */
 export default function SortSettingModal({
   open,
   onClose,
-  isMobile,
   rules = [],
   onChangeRules,
   onResetRules,
@@ -117,11 +115,7 @@ export default function SortSettingModal({
 
   const body = (
     <div
-      className={
-        isMobile
-          ? "mobile-setting-body flex flex-1 flex-col overflow-y-auto"
-          : "pc-table-setting-body"
-      }
+      className={"pc-table-setting-body"}
     >
       <div
         style={{
@@ -244,10 +238,7 @@ export default function SortSettingModal({
           {/* 默认排序固定在顶部，且不可排序、不可关闭 */}
           {localRules.find((item) => item.id === "default") && (
             <div
-              className={
-                (isMobile ? "mobile-setting-item" : "pc-table-setting-item") +
-                " glass"
-              }
+              className="glass"
               style={{
                 display: "flex",
                 alignItems: "center",
@@ -282,9 +273,8 @@ export default function SortSettingModal({
           axis="y"
           values={localRules.filter((item) => item.id !== "default")}
           onReorder={handleReorder}
-          className={isMobile ? "mobile-setting-list" : "pc-table-setting-list"}
-          layoutScroll={isMobile}
-          style={isMobile ? { touchAction: "none" } : undefined}
+          className="pc-table-setting-list"
+          layoutScroll={false}
         >
           <AnimatePresence mode="popLayout">
             {localRules
@@ -293,10 +283,7 @@ export default function SortSettingModal({
               <Reorder.Item
                 key={item.id}
                 value={item}
-                className={
-                  (isMobile ? "mobile-setting-item" : "pc-table-setting-item") +
-                  " glass"
-                }
+                className=" glass"
                 layout
                 initial={{ opacity: 0, scale: 0.98 }}
                 animate={{ opacity: 1, scale: 1 }}
@@ -308,7 +295,6 @@ export default function SortSettingModal({
                   mass: 1,
                   layout: { duration: 0.2 },
                 }}
-                style={isMobile ? { touchAction: "none" } : undefined}
               >
                 <div
                   className="drag-handle"
@@ -396,25 +382,13 @@ export default function SortSettingModal({
                 {item.id !== "default" && (
                   <button
                     type="button"
-                    className={
-                      isMobile ? "icon-button" : "icon-button pc-table-column-switch"
-                    }
+                    className="icon-button pc-table-column-switch"
                     onClick={(e) => {
                       e.stopPropagation();
                       handleToggle(item.id);
                     }}
                     title={item.enabled ? "关闭" : "开启"}
-                    style={
-                      isMobile
-                        ? {
-                            border: "none",
-                            backgroundColor: "transparent",
-                            cursor: "pointer",
-                            flexShrink: 0,
-                            display: "flex",
-                            alignItems: "center",
-                          }
-                        : {
+                    style={{
                             border: "none",
                             padding: "0 4px",
                             backgroundColor: "transparent",
@@ -422,8 +396,7 @@ export default function SortSettingModal({
                             flexShrink: 0,
                             display: "flex",
                             alignItems: "center",
-                          }
-                    }
+                          }}
                   >
                     <span
                       className={`dca-toggle-track ${
@@ -473,44 +446,6 @@ export default function SortSettingModal({
       )}
     </AnimatePresence>
   );
-
-  if (isMobile) {
-    return (
-      <Drawer
-        open={open}
-        onOpenChange={(v) => {
-          if (!v) onClose?.();
-        }}
-        direction="bottom"
-      >
-        <DrawerContent
-          className="glass"
-          defaultHeight="70vh"
-          minHeight="40vh"
-          maxHeight="90vh"
-        >
-          <DrawerHeader className="flex flex-row items-center justify-between gap-2 py-4">
-            <DrawerTitle className="flex items-center gap-2.5 text-left">
-              <SettingsIcon width="20" height="20" />
-              <span>排序个性化设置</span>
-            </DrawerTitle>
-            <DrawerClose
-              className="icon-button border-none bg-transparent p-1"
-              title="关闭"
-              style={{
-                borderColor: "transparent",
-                backgroundColor: "transparent",
-              }}
-            >
-              <CloseIcon width="20" height="20" />
-            </DrawerClose>
-          </DrawerHeader>
-          <div className="flex-1 overflow-y-auto">{body}</div>
-        </DrawerContent>
-        {resetConfirm}
-      </Drawer>
-    );
-  }
 
   if (typeof document === "undefined") return null;
 

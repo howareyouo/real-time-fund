@@ -10,7 +10,6 @@ import { isNumber, isString } from 'lodash';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Stat } from './Common';
 import FundTrendChart from './FundTrendChart';
-import FundIntradayChart from './FundIntradayChart';
 import FundDailyEarnings from './FundDailyEarnings';
 import {
   ChevronIcon,
@@ -404,36 +403,6 @@ export default function FundCard({
           基于 {Math.round(f.estPricedCoverage * 100)}% 持仓估算
         </div>
       )}
-
-      {(() => {
-        const showIntraday =
-          Array.isArray(valuationSeries?.[f.code]) && valuationSeries[f.code].length >= 2;
-        if (!showIntraday) return null;
-
-        if (
-          f.gztime &&
-          toTz(todayStr).startOf('day').isAfter(toTz(f.gztime).startOf('day'))
-        ) {
-          return null;
-        }
-
-        if (
-          f.jzrq &&
-          f.gztime &&
-          toTz(f.jzrq).startOf('day').isSameOrAfter(toTz(f.gztime).startOf('day'))
-        ) {
-          return null;
-        }
-
-        return (
-          <FundIntradayChart
-            key={`${f.code}-intraday-${theme}`}
-            series={valuationSeries[f.code]}
-            referenceNav={f.dwjz != null ? Number(f.dwjz) : undefined}
-            theme={theme}
-          />
-        );
-      })()}
 
       {layoutMode === 'drawer' ? (
         <Tabs
