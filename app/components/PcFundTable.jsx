@@ -417,17 +417,9 @@ export default function PcFundTable({
       : nextOrUpdater;
     persistPcGroupConfig({ pcTableColumnVisibility: next });
   };
-  const setColumnSizing = (nextOrUpdater) => {
-    const next = typeof nextOrUpdater === 'function'
-      ? nextOrUpdater(columnSizing)
-      : nextOrUpdater;
-    const { actions, ...rest } = next || {};
-    persistPcGroupConfig({ pcTableColumns: rest || {} });
-  };
   const [settingModalOpen, setSettingModalOpen] = useState(false);
   const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
   const handleResetSizing = () => {
-    setColumnSizing({});
     setResetConfirmOpen(false);
   };
 
@@ -524,10 +516,8 @@ export default function PcFundTable({
 
     updateVerticalState();
     window.addEventListener('scroll', throttledVerticalUpdate, { passive: true });
-    window.addEventListener('resize', throttledVerticalUpdate, { passive: true });
     return () => {
       window.removeEventListener('scroll', throttledVerticalUpdate);
-      window.removeEventListener('resize', throttledVerticalUpdate);
       throttledVerticalUpdate.cancel();
     };
   }, [stickyTop]);
@@ -814,7 +804,6 @@ export default function PcFundTable({
           );
         },
         size: 265,
-        minSize: 140,
         enablePinning: true,
         cell: (info) => (
           <FundNameCell
@@ -831,8 +820,7 @@ export default function PcFundTable({
       {
         id: 'relatedSector',
         header: '关联板块',
-        size: 180,
-        minSize: 120,
+        size: 120,
         cell: (info) => {
           const original = info.row.original || {};
           const code = original.code;
@@ -890,8 +878,7 @@ export default function PcFundTable({
       {
         id: 'period1w',
         header: '近1周',
-        size: 88,
-        minSize: 72,
+        size: 80,
         cell: (info) => {
           const original = info.row.original || {};
           const code = original.code;
@@ -913,8 +900,7 @@ export default function PcFundTable({
       {
         id: 'period1m',
         header: '近1月',
-        size: 88,
-        minSize: 72,
+        size: 80,
         cell: (info) => {
           const original = info.row.original || {};
           const code = original.code;
@@ -936,8 +922,7 @@ export default function PcFundTable({
       {
         id: 'period3m',
         header: '近3月',
-        size: 88,
-        minSize: 72,
+        size: 80,
         cell: (info) => {
           const original = info.row.original || {};
           const code = original.code;
@@ -959,8 +944,7 @@ export default function PcFundTable({
       {
         id: 'period6m',
         header: '近6月',
-        size: 88,
-        minSize: 72,
+        size: 80,
         cell: (info) => {
           const original = info.row.original || {};
           const code = original.code;
@@ -982,8 +966,7 @@ export default function PcFundTable({
       {
         id: 'period1y',
         header: '近1年',
-        size: 88,
-        minSize: 72,
+        size: 80,
         cell: (info) => {
           const original = info.row.original || {};
           const code = original.code;
@@ -1005,8 +988,7 @@ export default function PcFundTable({
       {
         accessorKey: 'latestNav',
         header: '最新净值',
-        size: 100,
-        minSize: 80,
+        size: 80,
         cell: (info) => {
           const original = info.row.original || {};
           const rawDate = original.latestNavDate ?? '-';
@@ -1030,8 +1012,7 @@ export default function PcFundTable({
       {
         accessorKey: 'estimateNav',
         header: '估算净值',
-        size: 100,
-        minSize: 80,
+        size: 80,
         cell: (info) => {
           const original = info.row.original || {};
           const rawDate = original.estimateNavDate ?? '-';
@@ -1059,8 +1040,7 @@ export default function PcFundTable({
       {
         accessorKey: 'yesterdayChangePercent',
         header: '最新涨幅',
-        size: 135,
-        minSize: 100,
+        size: 100,
         cell: (info) => {
           const original = info.row.original || {};
           const value = original.yesterdayChangeValue;
@@ -1086,8 +1066,7 @@ export default function PcFundTable({
       {
         accessorKey: 'estimateChangePercent',
         header: '估算涨幅',
-        size: 135,
-        minSize: 100,
+        size: 100,
         cell: (info) => {
           const original = info.row.original || {};
           const value = original.estimateChangeValue;
@@ -1118,8 +1097,7 @@ export default function PcFundTable({
       {
         accessorKey: 'totalChangePercent',
         header: '估算收益',
-        size: 135,
-        minSize: 100,
+        size: 100,
         cell: (info) => {
           const original = info.row.original || {};
           const value = original.estimateProfitValue;
@@ -1151,8 +1129,7 @@ export default function PcFundTable({
       {
         accessorKey: 'holdingAmount',
         header: '持仓金额',
-        size: 135,
-        minSize: 100,
+        size: 100,
         cell: (info) => {
           const original = info.row.original || {};
           if (original.holdingAmountValue == null) {
@@ -1214,8 +1191,7 @@ export default function PcFundTable({
       {
         accessorKey: 'holdingDays',
         header: '持有天数',
-        size: 100,
-        minSize: 80,
+        size: 80,
         cell: (info) => {
           const original = info.row.original || {};
           const value = original.holdingDaysValue;
@@ -1236,8 +1212,7 @@ export default function PcFundTable({
       {
         accessorKey: 'todayProfit',
         header: '当日收益',
-        size: 135,
-        minSize: 100,
+        size: 100,
         cell: (info) => {
           const original = info.row.original || {};
           const value = original.todayProfitValue;
@@ -1269,8 +1244,7 @@ export default function PcFundTable({
       {
         accessorKey: 'yesterdayProfit',
         header: '昨日收益',
-        size: 135,
-        minSize: 100,
+        size: 100,
         cell: (info) => {
           const original = info.row.original || {};
           const value = original.yesterdayProfitValue;
@@ -1305,8 +1279,7 @@ export default function PcFundTable({
       {
         accessorKey: 'holdingProfit',
         header: '持有收益',
-        size: 135,
-        minSize: 100,
+        size: 100,
         cell: (info) => {
           const original = info.row.original || {};
           const value = original.holdingProfitValue;
@@ -1353,9 +1326,6 @@ export default function PcFundTable({
           </div>
         ),
         size: 80,
-        minSize: 80,
-        maxSize: 80,
-        enableResizing: false,
         enablePinning: true,
         meta: {
           align: 'center',
@@ -1417,15 +1387,6 @@ export default function PcFundTable({
     data,
     columns,
     enableColumnPinning: true,
-    enableColumnResizing: true,
-    columnResizeMode: 'onChange',
-    onColumnSizingChange: (updater) => {
-      setColumnSizing((prev) => {
-        const next = typeof updater === 'function' ? updater(prev) : updater;
-        const { actions, ...rest } = next || {};
-        return rest || {};
-      });
-    },
     state: {
       columnSizing,
       columnOrder,
@@ -1493,7 +1454,7 @@ export default function PcFundTable({
               className={`table-header-cell ${align}`}
               style={style}
             >
-              <div style={{ paddingRight: isRightAligned ? '20px' : '0' }}>
+              <div>
                 {header.isPlaceholder
                   ? null
                   : flexRender(
@@ -1501,14 +1462,6 @@ export default function PcFundTable({
                     header.getContext(),
                   )}
               </div>
-              {!forPortal && (
-                <div
-                  onMouseDown={header.column.getCanResize() ? header.getResizeHandler() : undefined}
-                  onTouchStart={header.column.getCanResize() ? header.getResizeHandler() : undefined}
-                  className={`resizer ${header.column.getIsResizing() ? 'isResizing' : ''
-                    } ${header.column.getCanResize() ? '' : 'disabled'}`}
-                />
-              )}
             </div>
           );
         })}
@@ -1571,57 +1524,9 @@ export default function PcFundTable({
           padding-right: 8px;
           position: relative; /* For resizer */
         }
-        
-        /* 拖拽把手样式 */
-        .resizer {
-          position: absolute;
-          right: 0;
-          top: 0;
-          height: 100%;
-          width: 8px;
-          background: transparent;
-          cursor: col-resize;
-          user-select: none;
-          touch-action: none;
-          z-index: 20;
-        }
-
-        .resizer::after {
-          content: '';
-          position: absolute;
-          right: 3px;
-          top: 12%;
-          bottom: 12%;
-          width: 2px;
-          background: var(--border);
-          opacity: 0.35;
-          transition: opacity 0.2s, background-color 0.2s, box-shadow 0.2s;
-        }
-
-        .resizer:hover::after {
-          opacity: 1;
-          background: var(--primary);
-          box-shadow: 0 0 0 2px rgba(34, 211, 238, 0.2);
-        }
-        
-        .table-header-cell:hover .resizer::after {
-          opacity: 0.75;
-        }
-
-        .resizer.disabled {
-          cursor: default;
-          background: transparent;
-          pointer-events: none;
-        }
-
-        .resizer.disabled::after {
-          opacity: 0;
-        }
       `}</style>
-        {/* 表头 */}
         {renderTableHeader(false)}
 
-        {/* 表体 */}
         <DndContext
           sensors={sensors}
           collisionDetection={closestCenter}
@@ -1721,7 +1626,7 @@ export default function PcFundTable({
                     className={`table-header-cell ${align}`}
                     style={style}
                   >
-                    <div style={{ paddingRight: isRightAligned ? '20px' : '0' }}>
+                    <div>
                       {header.isPlaceholder
                         ? null
                         : flexRender(
