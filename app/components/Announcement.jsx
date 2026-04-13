@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
-const ANNOUNCEMENT_KEY = 'hasClosedAnnouncement_v24';
+const ANNOUNCEMENT_KEY = 'hasClosedAnnouncement_v25';
 
 export default function Announcement() {
   const [isVisible, setIsVisible] = useState(false);
@@ -75,11 +75,13 @@ export default function Announcement() {
               <span>公告</span>
             </div>
             <div style={{ color: 'var(--text)', lineHeight: '1.6', fontSize: '15px', overflowY: 'auto', minHeight: 0, flex: 1, paddingRight: '4px' }}>
-              <p>v1.1.0 更新内容如下：</p>
-              <p>1. 新增分组汇总。</p>
-              <p>2. 新增移动分组功能。</p>
-              <p>3. 移动端新增编辑模式（批量删除、批量移动分组、拖拽顺序）。</p>
-              <p>4. 取消删除和刷新竞态。</p>
+              <p>v1.1.1 更新内容如下：</p>
+              <p>1. 全部分组增加关联持仓逻辑（同一只基金，全部分组不设置持仓，1个或多个自定义分组存在持仓，会在全部分组合并计算）。</p>
+              <p>2. 自定义分组设置持仓判断是否从全部分组合并。</p>
+              <p>3. 修复近1周、近1月等在移动端数字适配问题。</p>
+              <br/>
+              <p>注：</p>
+              <p>全部分组与自定义分组各自独立持仓，如果需要在自定义分组设置持仓建议清空在全部分组的持仓，也可以把全部分组的持仓迁移到自定义分组。</p>
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '8px' }}>
