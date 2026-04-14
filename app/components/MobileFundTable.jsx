@@ -341,6 +341,13 @@ export default function MobileFundTable({
     [data],
   );
 
+  /** 全部/自选下「关联汇总持仓」行不参与编辑模式批量选择 */
+  const batchSelectableCodes = useMemo(
+    () => (Array.isArray(data) ? data.filter((d) => !d?.isHoldingLinked).map((d) => d?.code).filter(Boolean) : []),
+    [data],
+  );
+  const batchSelectableCount = batchSelectableCodes.length;
+
   const editSelectedCodesList = useMemo(() => Array.from(editSelectedCodes || []), [editSelectedCodes]);
 
   const clearEditLongPressTimer = useCallback(() => {
@@ -383,12 +390,30 @@ export default function MobileFundTable({
     });
   }, [selectableCodes]);
 
+  useEffect(() => {
+    const linkedCodes = new Set(
+      (Array.isArray(data) ? data : [])
+        .filter((d) => d && d.isHoldingLinked && d.code)
+        .map((d) => d.code),
+    );
+    if (!linkedCodes.size) return;
+    setEditSelectedCodes((prev) => {
+      if (!prev?.size) return prev;
+      let changed = false;
+      const next = new Set(prev);
+      for (const c of linkedCodes) {
+        if (next.delete(c)) changed = true;
+      }
+      return changed ? next : prev;
+    });
+  }, [data]);
+
   const setAllEditSelected = useCallback((nextChecked) => {
     setEditSelectedCodes(() => {
       if (!nextChecked) return new Set();
-      return new Set(selectableCodes);
+      return new Set(batchSelectableCodes);
     });
-  }, [selectableCodes]);
+  }, [batchSelectableCodes]);
 
   useEffect(() => () => clearEditLongPressTimer(), [clearEditLongPressTimer]);
 
@@ -987,6 +1012,7 @@ export default function MobileFundTable({
       return (
         <div className="name-cell-content" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <label
+            title={holdingLocked ? '关联持仓不可批量选择' : '选择用于批量操作'}
             style={{
               display: 'flex',
               alignItems: 'center',
@@ -995,16 +1021,18 @@ export default function MobileFundTable({
               width: 26,
               height: 26,
               marginRight: 4,
-              cursor: 'pointer',
+              cursor: holdingLocked ? 'not-allowed' : 'pointer',
+              opacity: holdingLocked ? 0.45 : 1,
             }}
             onPointerDown={(e) => e.stopPropagation()}
             onClick={(e) => e.stopPropagation()}
           >
             <input
               type="checkbox"
-              checked={editSelected}
+              disabled={holdingLocked}
+              checked={!holdingLocked && editSelected}
               onChange={() => {
-                if (!code) return;
+                if (!code || holdingLocked) return;
                 setEditSelectedCodes((prev) => {
                   const next = new Set(prev);
                   if (next.has(code)) next.delete(code);
@@ -1016,7 +1044,7 @@ export default function MobileFundTable({
                 width: 18,
                 height: 18,
                 accentColor: 'var(--primary)',
-                cursor: 'pointer',
+                cursor: holdingLocked ? 'not-allowed' : 'pointer',
               }}
             />
           </label>
@@ -1198,7 +1226,7 @@ export default function MobileFundTable({
         accessorKey: 'fundName',
         header: () => {
           if (isEditMode) {
-            const allCount = selectableCodes.length;
+            const allCount = batchSelectableCount;
             const selectedCount = editSelectedCodes.size;
             const checked = allCount > 0 && selectedCount === allCount;
             const indeterminate = selectedCount > 0 && selectedCount < allCount;
@@ -1749,6 +1777,7 @@ export default function MobileFundTable({
       onReorder,
       data,
       selectableCodes,
+      batchSelectableCount,
       setAllEditSelected,
     ]
   );
@@ -1990,7 +2019,8 @@ export default function MobileFundTable({
                                 if (sel?.removeAllRanges) sel.removeAllRanges();
                               } catch { /* empty */ }
                               setIsEditMode(true);
-                              setEditSelectedCodes(new Set([c]));
+                              const linked = !!row.original?.isHoldingLinked;
+                              setEditSelectedCodes(linked ? new Set() : new Set([c]));
                             }, 550);
                           }}
                           onPointerMove={(e) => {
