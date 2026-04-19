@@ -8290,22 +8290,26 @@ export default function HomePage() {
         )}
       </AnimatePresence>
 
-      <FundTagsEditDialog
-        open={fundTagsEdit.open}
-        onOpenChange={(open) => setFundTagsEdit((s) => ({ ...s, open }))}
-        isMobile={isMobile}
-        fundCode={fundTagsEdit.code ?? undefined}
-        fundName={fundTagsEdit.name}
-        tags={fundTagsEdit.tags}
-        onSave={handleSaveFundTags}
-        recommendedTagItems={fundTagRecords.map((r) => ({
-          name: String(r?.name ?? '').trim(),
-          theme: String(r?.theme ?? '').trim() || DEFAULT_FUND_TAG_THEME,
-        })).filter((x) => x.name)}
-        onAddPoolTag={handleAddPoolTag}
-        onDeleteGlobalTag={handleDeleteGlobalTag}
-        getTagUsageLabels={getTagUsageLabels}
-      />
+      <AnimatePresence>
+        {fundTagsEdit.open && (
+          <FundTagsEditDialog
+            open={fundTagsEdit.open}
+            onOpenChange={(open) => setFundTagsEdit((s) => ({ ...s, open }))}
+            isMobile={isMobile}
+            fundCode={fundTagsEdit.code ?? undefined}
+            fundName={fundTagsEdit.name}
+            tags={fundTagsEdit.tags}
+            onSave={handleSaveFundTags}
+            recommendedTagItems={fundTagRecords.map((r) => ({
+              name: String(r?.name ?? '').trim(),
+              theme: String(r?.theme ?? '').trim() || DEFAULT_FUND_TAG_THEME,
+            })).filter((x) => x.name)}
+            onAddPoolTag={handleAddPoolTag}
+            onDeleteGlobalTag={handleDeleteGlobalTag}
+            getTagUsageLabels={getTagUsageLabels}
+          />
+        )}
+      </AnimatePresence>
 
       <AnimatePresence>
         {holdingMigrateDialog.open && (
@@ -8433,34 +8437,40 @@ export default function HomePage() {
         onChange={handleFilesUpload}
       />
 
-      {settingsOpen && (
-        <SettingsModal
-          onClose={() => setSettingsOpen(false)}
-          tempSeconds={tempSeconds}
-          setTempSeconds={setTempSeconds}
-          saveSettings={saveSettings}
-          exportLocalData={exportLocalData}
-          importFileRef={importFileRef}
-          handleImportFileChange={handleImportFileChange}
-          importMsg={importMsg}
-          isMobile={isMobile}
-          containerWidth={containerWidth}
-          setContainerWidth={setContainerWidth}
-          onResetContainerWidth={handleResetContainerWidth}
-          showMarketIndexPc={showMarketIndexPc}
-          showMarketIndexMobile={showMarketIndexMobile}
-          showGroupFundSearchPc={showGroupFundSearchPc}
-          showGroupFundSearchMobile={showGroupFundSearchMobile}
-        />
-      )}
+      <AnimatePresence>
+        {settingsOpen && (
+          <SettingsModal
+            onClose={() => setSettingsOpen(false)}
+            tempSeconds={tempSeconds}
+            setTempSeconds={setTempSeconds}
+            saveSettings={saveSettings}
+            exportLocalData={exportLocalData}
+            importFileRef={importFileRef}
+            handleImportFileChange={handleImportFileChange}
+            importMsg={importMsg}
+            isMobile={isMobile}
+            containerWidth={containerWidth}
+            setContainerWidth={setContainerWidth}
+            onResetContainerWidth={handleResetContainerWidth}
+            showMarketIndexPc={showMarketIndexPc}
+            showMarketIndexMobile={showMarketIndexMobile}
+            showGroupFundSearchPc={showGroupFundSearchPc}
+            showGroupFundSearchMobile={showGroupFundSearchMobile}
+          />
+        )}
+      </AnimatePresence>
 
       {/* 更新提示弹窗 */}
-      <UpdatePromptModal
-        open={updateModalOpen}
-        updateContent={updateContent}
-        onClose={() => setUpdateModalOpen(false)}
-        onRefresh={() => window.location.reload()}
-      />
+      <AnimatePresence>
+        {updateModalOpen && (
+          <UpdatePromptModal
+            open={updateModalOpen}
+            updateContent={updateContent}
+            onClose={() => setUpdateModalOpen(false)}
+            onRefresh={() => window.location.reload()}
+          />
+        )}
+      </AnimatePresence>
 
       <AnimatePresence>
         {isScanning && (
@@ -8475,41 +8485,47 @@ export default function HomePage() {
       </AnimatePresence>
 
       {/* 登录模态框 */}
-      {loginModalOpen && (
-        <LoginModal
-          onClose={() => {
-            setLoginModalOpen(false);
-            setLoginError('');
-            setLoginSuccess('');
-            setLoginEmail('');
-            setLoginOtp('');
-            setLoginLoading(false);
-          }}
-          isMobile={isMobile}
-          loginEmail={loginEmail}
-          setLoginEmail={setLoginEmail}
-          loginOtp={loginOtp}
-          setLoginOtp={setLoginOtp}
-          loginLoading={loginLoading}
-          loginError={loginError}
-          loginSuccess={loginSuccess}
-          handleSendOtp={handleSendOtp}
-          handleVerifyEmailOtp={handleVerifyEmailOtp}
-          handleGithubLogin={isSupabaseConfigured && process.env.NEXT_PUBLIC_IS_GITHUB_LOGIN === 'true' ? handleGithubLogin : undefined}
-        />
-      )}
+      <AnimatePresence>
+        {loginModalOpen && (
+          <LoginModal
+            onClose={() => {
+              setLoginModalOpen(false);
+              setLoginError('');
+              setLoginSuccess('');
+              setLoginEmail('');
+              setLoginOtp('');
+              setLoginLoading(false);
+            }}
+            isMobile={isMobile}
+            loginEmail={loginEmail}
+            setLoginEmail={setLoginEmail}
+            loginOtp={loginOtp}
+            setLoginOtp={setLoginOtp}
+            loginLoading={loginLoading}
+            loginError={loginError}
+            loginSuccess={loginSuccess}
+            handleSendOtp={handleSendOtp}
+            handleVerifyEmailOtp={handleVerifyEmailOtp}
+            handleGithubLogin={isSupabaseConfigured && process.env.NEXT_PUBLIC_IS_GITHUB_LOGIN === 'true' ? handleGithubLogin : undefined}
+          />
+        )}
+      </AnimatePresence>
 
       {/* 排序个性化设置弹框 */}
-      <SortSettingModal
-        open={sortSettingOpen}
-        onClose={() => setSortSettingOpen(false)}
-        isMobile={isMobile}
-        rules={sortRules}
-        onChangeRules={setSortRules}
-        sortDisplayMode={sortDisplayMode}
-        onChangeSortDisplayMode={setSortDisplayMode}
-        onResetRules={() => setSortRules(DEFAULT_SORT_RULES)}
-      />
+      <AnimatePresence>
+        {sortSettingOpen && (
+          <SortSettingModal
+            open={sortSettingOpen}
+            onClose={() => setSortSettingOpen(false)}
+            isMobile={isMobile}
+            rules={sortRules}
+            onChangeRules={setSortRules}
+            sortDisplayMode={sortDisplayMode}
+            onChangeSortDisplayMode={setSortDisplayMode}
+            onResetRules={() => setSortRules(DEFAULT_SORT_RULES)}
+          />
+        )}
+      </AnimatePresence>
 
       {/* 全局轻提示 Toast */}
       <AnimatePresence>

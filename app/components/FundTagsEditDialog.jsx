@@ -407,7 +407,7 @@ export default function FundTagsEditDialog({
           >
             <DrawerHeader className="flex flex-row items-center justify-between gap-2 border-b border-[var(--border)] py-4 text-left">
               <DrawerTitle className="text-base font-semibold">编辑标签</DrawerTitle>
-              <DrawerClose className="icon-button border-none bg-transparent p-1" title="关闭">
+              <DrawerClose className="icon-button border-none bg-transparent p-1" title="关闭" style={{ border: 'none', background: 'transparent' }}>
                 <CloseIcon width="20" height="20" />
               </DrawerClose>
             </DrawerHeader>
