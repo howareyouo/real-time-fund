@@ -4246,10 +4246,12 @@ export default function HomePage() {
     // 【步骤 2】参数归一化：去重并缓存当前本地存储中的基金代码，用于判断基金是否已被用户删除
     const uniqueCodes = Array.from(new Set(codes));
     let cachedStoredFundCodes = new Set();
+    let cachedStoredFundsByCode = new Map();
     try {
       const arr = storageStore.getItem('funds', []);
       if (Array.isArray(arr)) {
         cachedStoredFundCodes = new Set(arr.map((x) => x?.code).filter(Boolean));
+        cachedStoredFundsByCode = new Map(arr.filter((x) => x?.code).map((x) => [x.code, x]));
       }
     } catch (e) {
       console.warn('读取缓存基金列表失败', e);
@@ -4258,6 +4260,10 @@ export default function HomePage() {
     const fundCodeStillInStorage = (code) => {
       if (!code) return false;
       return cachedStoredFundCodes.has(code);
+    };
+    const getStoredFundSnapshot = (code) => {
+      if (!code) return null;
+      return cachedStoredFundsByCode.get(code) || null;
     };
 
     try {
@@ -4367,8 +4373,8 @@ export default function HomePage() {
       const nextValuationSeries = { ...valuationSeries };
       let valuationChanged = false;
 
-      // 【步骤 3】核心流水线：使用 asyncPool 控制并发（同时抓取 5 个基金），平衡性能与浏览器限制
-      await asyncPool(5, uniqueCodes, async (c) => {
+      // 【步骤 3】核心流水线：使用 asyncPool 控制并发（同时抓取 3 个基金），降低接口并发压力
+      await asyncPool(3, uniqueCodes, async (c) => {
         if (!fundCodeStillInStorage(c)) return;
         let data = null;
         try {
@@ -4385,6 +4391,10 @@ export default function HomePage() {
         }
 
         if (!data || !fundCodeStillInStorage(c)) return;
+
+        // 如果估值接口本轮失败（回退到 fallback），且本地已有旧数据，则保留旧数据不覆盖。
+        if (data.valuationSource === 'fallback' && getStoredFundSnapshot(c)) return;
+
         updated.push(data);
 
         // 【步骤 3.2】估值时序记录：提取实时估值点（gsz），用于绘制分时图
