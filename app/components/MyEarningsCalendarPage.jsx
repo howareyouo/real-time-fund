@@ -14,13 +14,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import {
-  Drawer,
-  DrawerClose,
-  DrawerContent,
-  DrawerHeader,
-  DrawerTitle,
-} from '@/components/ui/drawer';
 import { CloseIcon } from './Icons';
 import FitText from './FitText';
 import { cn } from '@/lib/utils';
@@ -45,7 +38,7 @@ function earningsClass(v) {
 
 const WEEKDAY_LABELS = ['日', '一', '二', '三', '四', '五', '六'];
 
-export default function MyEarningsCalendarPage({ open, onOpenChange, series = [], masked, onGoHome, isMobile }) {
+export default function MyEarningsCalendarPage({ open, onOpenChange, series = [], masked, onGoHome }) {
   const reduceMotion = useReducedMotion();
 
   const hasData = Array.isArray(series) && series.length > 0;
@@ -149,14 +142,9 @@ export default function MyEarningsCalendarPage({ open, onOpenChange, series = []
         ? cursorYear >= now.year()
         : false;
 
-  const resolvedIsMobile =
-    typeof isMobile === 'boolean'
-      ? isMobile
-      : (typeof window !== 'undefined' ? window.matchMedia?.('(max-width: 640px)')?.matches : false);
-
-  const pcCellDayFontSize = resolvedIsMobile ? 15 : 16;
-  const pcEarningsMaxFontSize = resolvedIsMobile ? 10 : 12;
-  const pcEarningsMinFontSize = resolvedIsMobile ? 6 : 8;
+  const pcCellDayFontSize = 16;
+  const pcEarningsMaxFontSize = 12;
+  const pcEarningsMinFontSize = 8;
 
   const content = (
     <div className="my-earnings-drawer-inner flex min-h-0 flex-1 flex-col overflow-hidden px-5">
@@ -462,31 +450,6 @@ export default function MyEarningsCalendarPage({ open, onOpenChange, series = []
           </div>
         </div>
   );
-
-  if (resolvedIsMobile) {
-    return (
-      <Drawer open={!!open} onOpenChange={onOpenChange}>
-        <DrawerContent
-          className={cn('my-earnings-drawer-content flex max-h-[96vh] flex-col gap-0 p-0')}
-          defaultHeight="92vh"
-          maxHeight="96vh"
-          minHeight="44vh"
-        >
-          <DrawerHeader className="flex-shrink-0 flex flex-row items-center justify-between gap-2 space-y-0 px-5 pb-3 pt-2 text-left">
-            <DrawerTitle className="text-base font-semibold text-[var(--text)]">我的收益</DrawerTitle>
-            <DrawerClose
-              className="icon-button border-none bg-transparent p-1"
-              title="关闭"
-              style={{ borderColor: 'transparent', backgroundColor: 'transparent' }}
-            >
-              <CloseIcon width="20" height="20" />
-            </DrawerClose>
-          </DrawerHeader>
-          {content}
-        </DrawerContent>
-      </Drawer>
-    );
-  }
 
   return (
     <Dialog open={!!open} onOpenChange={onOpenChange}>

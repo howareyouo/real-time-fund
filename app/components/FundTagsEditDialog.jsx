@@ -9,13 +9,6 @@ import {
   DialogContent,
   DialogTitle,
 } from '@/components/ui/dialog';
-import {
-  Drawer,
-  DrawerClose,
-  DrawerContent,
-  DrawerHeader,
-  DrawerTitle,
-} from '@/components/ui/drawer';
 import ConfirmModal from './ConfirmModal';
 import { CloseIcon } from './Icons';
 import { cn } from '@/lib/utils';
@@ -54,7 +47,6 @@ function normalizeTagDraft(raw) {
 export default function FundTagsEditDialog({
   open,
   onOpenChange,
-  isMobile = false,
   fundCode,
   fundName = '',
   tags = [],
@@ -423,36 +415,6 @@ export default function FundTagsEditDialog({
       }
     />
   ) : null;
-
-  if (isMobile) {
-    return (
-      <>
-        <Drawer
-          open={open}
-          onOpenChange={onOpenChange}
-          direction="bottom"
-        >
-          <DrawerContent
-            className="glass max-h-[90vh]"
-            defaultHeight="77vh"
-            minHeight="36vh"
-            maxHeight="90vh"
-          >
-            <DrawerHeader className="flex flex-row items-center justify-between gap-2 border-b border-[var(--border)] py-4 text-left">
-              <DrawerTitle className="text-base font-semibold">编辑标签</DrawerTitle>
-              <DrawerClose className="icon-button border-none bg-transparent p-1" title="关闭" style={{ border: 'none', background: 'transparent' }}>
-                <CloseIcon width="20" height="20" />
-              </DrawerClose>
-            </DrawerHeader>
-            <div className="scrollbar-y-styled flex-1 overflow-y-auto px-4 pb-6 pt-2">
-              {body}
-            </div>
-          </DrawerContent>
-        </Drawer>
-        {deleteConfirmModal}
-      </>
-    );
-  }
 
   return (
     <>

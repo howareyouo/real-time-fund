@@ -8,13 +8,6 @@ import {
 } from '@tanstack/react-table';
 import { CloseIcon } from './Icons';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
-import {
-  Drawer,
-  DrawerClose,
-  DrawerContent,
-  DrawerHeader,
-  DrawerTitle,
-} from '@/components/ui/drawer';
 
 function buildTableRows(series) {
   if (!Array.isArray(series) || series.length === 0) return [];
@@ -28,18 +21,8 @@ export default function FundDailyEarningsDetailModal({
   title = '收益明细',
   masked = false,
 }) {
-  const [isMobile, setIsMobile] = useState(false);
   const [visibleCount, setVisibleCount] = useState(30);
   const scrollRef = useRef(null);
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const mq = window.matchMedia('(max-width: 768px)');
-    const update = () => setIsMobile(mq.matches);
-    update();
-    mq.addEventListener('change', update);
-    return () => mq.removeEventListener('change', update);
-  }, []);
 
   useEffect(() => {
     if (open) setVisibleCount(30);
@@ -246,38 +229,6 @@ export default function FundDailyEarningsDetailModal({
   );
 
   if (!open) return null;
-
-  if (isMobile) {
-    return (
-      <Drawer open={open} onOpenChange={handleOpenChange} direction="bottom">
-        <DrawerContent
-          className="glass"
-          defaultHeight="70vh"
-          minHeight="40vh"
-          maxHeight="90vh"
-        >
-          <DrawerHeader className="flex flex-row items-center justify-between gap-2 py-3">
-            <DrawerTitle className="flex items-center gap-2.5 text-left">
-              <span>{title}</span>
-            </DrawerTitle>
-            <DrawerClose
-              className="icon-button border-none bg-transparent p-1"
-              title="关闭"
-              style={{
-                borderColor: 'transparent',
-                backgroundColor: 'transparent',
-              }}
-            >
-              <CloseIcon width="20" height="20" />
-            </DrawerClose>
-          </DrawerHeader>
-          <div className="flex-1 px-4 pb-4">
-            {body}
-          </div>
-        </DrawerContent>
-      </Drawer>
-    );
-  }
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>

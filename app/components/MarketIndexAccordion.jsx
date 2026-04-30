@@ -194,7 +194,6 @@ const DEFAULT_SELECTED_CODES = ['sh000001', 'sz399001', 'sz399006'];
 export default function MarketIndexAccordion({
   navbarHeight = 0,
   onHeightChange,
-  isMobile,
   onCustomSettingsChange,
   refreshing = false,
 }) {
@@ -333,8 +332,8 @@ export default function MarketIndexAccordion({
     position: 'sticky',
     top: topMargin,
     zIndex: 10,
-    width: isMobile ? 'calc(100% + 24px)' : '100%',
-    marginLeft: isMobile ? -12 : 0,
+    width: '100%',
+    marginLeft: 0,
   };
 
   if (loading && indices.length === 0) {
@@ -471,9 +470,7 @@ export default function MarketIndexAccordion({
                 <div
                   key={item.code || i}
                   style={{
-                    flex: isMobile
-                      ? '0 0 calc((100% - 24px) / 3)'
-                      : '0 0 calc((100% - 48px) / 5)',
+                    flex: '0 0 calc((100% - 48px) / 5)',
                   }}
                 >
                   <IndexCard item={item} />
@@ -486,7 +483,6 @@ export default function MarketIndexAccordion({
       <MarketSettingModal
         open={settingOpen}
         onClose={() => setSettingOpen(false)}
-        isMobile={isMobile}
         indices={indices}
         selectedCodes={selectedCodes}
         onChangeSelected={setSelectedCodes}

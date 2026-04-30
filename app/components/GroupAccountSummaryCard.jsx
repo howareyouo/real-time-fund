@@ -125,8 +125,6 @@ function Sparkline({ series, className = '' }) {
 }
 
 export default function GroupAccountSummaryCard({
-  /** 与首页 `isMobile` 一致：true 为移动布局，false 为 PC */
-  isMobile = false,
   /** 点击整张卡片时回调（如切换到对应分组 / 「全部」） */
   onActivate,
   groupName,
@@ -167,7 +165,7 @@ export default function GroupAccountSummaryCard({
       }
       style={{
         marginBottom: 6,
-        padding: isMobile ? '10px 10px' : '10px 12px',
+        padding: '10px 12px',
         background: 'rgba(255, 255, 255, 0.04)',
         borderRadius: 12,
         cursor: interactive ? 'pointer' : undefined,
@@ -175,9 +173,9 @@ export default function GroupAccountSummaryCard({
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? 6 : 8, minWidth: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
           <span style={{ display: 'flex', flexShrink: 0, lineHeight: 0 }} aria-hidden>
-            <GroupCardTitleIcon size={isMobile ? 20 : 22} />
+            <GroupCardTitleIcon size={22} />
           </span>
           <span style={{ fontWeight: 700, fontSize: 15, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {groupName}
@@ -211,7 +209,7 @@ export default function GroupAccountSummaryCard({
         <Sparkline series={sparkSeries} />
       </div>
 
-      <div style={{ display: 'flex', justifyContent: 'space-between', gap: isMobile ? 10 : 16 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16 }}>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div className="muted" style={{ fontSize: 12, marginBottom: 2 }}>
             持有收益

@@ -16,22 +16,17 @@ export default function SettingsModal({
   importFileRef,
   handleImportFileChange,
   importMsg,
-  isMobile,
   containerWidth = 1200,
   setContainerWidth,
   onResetContainerWidth,
   showMarketIndexPc = true,
-  showMarketIndexMobile = true,
   showGroupFundSearchPc = true,
-  showGroupFundSearchMobile = true,
 }) {
   const [sliderDragging, setSliderDragging] = useState(false);
   const [resetWidthConfirmOpen, setResetWidthConfirmOpen] = useState(false);
   const [localSeconds, setLocalSeconds] = useState(tempSeconds);
   const [localShowMarketIndexPc, setLocalShowMarketIndexPc] = useState(showMarketIndexPc);
-  const [localShowMarketIndexMobile, setLocalShowMarketIndexMobile] = useState(showMarketIndexMobile);
   const [localShowGroupFundSearchPc, setLocalShowGroupFundSearchPc] = useState(showGroupFundSearchPc);
-  const [localShowGroupFundSearchMobile, setLocalShowGroupFundSearchMobile] = useState(showGroupFundSearchMobile);
   const pageWidthTrackRef = useRef(null);
 
   const clampedWidth = Math.min(2000, Math.max(600, Number(containerWidth) || 1200));
@@ -69,16 +64,8 @@ export default function SettingsModal({
   }, [showMarketIndexPc]);
 
   useEffect(() => {
-    setLocalShowMarketIndexMobile(showMarketIndexMobile);
-  }, [showMarketIndexMobile]);
-
-  useEffect(() => {
     setLocalShowGroupFundSearchPc(showGroupFundSearchPc);
   }, [showGroupFundSearchPc]);
-
-  useEffect(() => {
-    setLocalShowGroupFundSearchMobile(showGroupFundSearchMobile);
-  }, [showGroupFundSearchMobile]);
 
   return (
     <Dialog
@@ -132,7 +119,7 @@ export default function SettingsModal({
             )}
           </div>
 
-          {!isMobile && setContainerWidth && (
+          {setContainerWidth && (
             <div className="form-group" style={{ marginBottom: 16 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
                 <div className="muted" style={{ fontSize: '0.8rem' }}>页面宽度</div>
@@ -191,12 +178,11 @@ export default function SettingsModal({
             <div className="muted" style={{ marginBottom: 8, fontSize: '0.8rem' }}>显示大盘指数</div>
             <div className="row" style={{ justifyContent: 'flex-start', alignItems: 'center' }}>
               <Switch
-                checked={isMobile ? localShowMarketIndexMobile : localShowMarketIndexPc}
+                checked={localShowMarketIndexPc}
                 className="ml-2 scale-125"
                 onCheckedChange={(checked) => {
                   const nextValue = Boolean(checked);
-                  if (isMobile) setLocalShowMarketIndexMobile(nextValue);
-                  else setLocalShowMarketIndexPc(nextValue);
+                  setLocalShowMarketIndexPc(nextValue);
                 }}
                 aria-label="显示大盘指数"
               />
@@ -207,12 +193,11 @@ export default function SettingsModal({
             <div className="muted" style={{ marginBottom: 8, fontSize: '0.8rem' }}>显示分组内基金搜索</div>
             <div className="row" style={{ justifyContent: 'flex-start', alignItems: 'center' }}>
               <Switch
-                checked={isMobile ? localShowGroupFundSearchMobile : localShowGroupFundSearchPc}
+                checked={localShowGroupFundSearchPc}
                 className="ml-2 scale-125"
                 onCheckedChange={(checked) => {
                   const nextValue = Boolean(checked);
-                  if (isMobile) setLocalShowGroupFundSearchMobile(nextValue);
-                  else setLocalShowGroupFundSearchPc(nextValue);
+                  setLocalShowGroupFundSearchPc(nextValue);
                 }}
                 aria-label="显示分组内基金搜索"
               />
@@ -248,9 +233,8 @@ export default function SettingsModal({
               onClick={(e) => saveSettings(
                 e,
                 localSeconds,
-                isMobile ? localShowMarketIndexMobile : localShowMarketIndexPc,
-                isMobile ? localShowGroupFundSearchMobile : localShowGroupFundSearchPc,
-                isMobile
+                localShowMarketIndexPc,
+                localShowGroupFundSearchPc
               )}
               disabled={localSeconds < 30}
             >

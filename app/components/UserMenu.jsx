@@ -10,7 +10,6 @@ import { CalendarIcon, LoginIcon, LogoutIcon, SettingsIcon, UserIcon } from './I
 export default function UserMenu({
   user,
   userAvatar,
-  isMobile,
   navbarHeight,
   lastSyncTime,
   isSyncing,
@@ -82,7 +81,7 @@ export default function UserMenu({
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: -10, scale: 0.95 }}
               transition={{ duration: 0.15 }}
-              style={{ transformOrigin: 'top right', top: navbarHeight + (isMobile ? -20 : 10) }}
+              style={{ transformOrigin: 'top right', top: navbarHeight + 10 }}
             >
               {user ? (
                 <>
@@ -112,18 +111,16 @@ export default function UserMenu({
                     </div>
                   </div>
                   <div className="user-menu-divider" />
-                  {!isMobile && (
-                    <button
-                      className="user-menu-item"
-                      onClick={() => {
-                        setUserMenuOpen(false);
-                        onOpenPortfolioEarnings?.();
-                      }}
-                    >
-                      <CalendarIcon width="16" height="16" />
-                      <span>我的收益</span>
-                    </button>
-                  )}
+                  <button
+                    className="user-menu-item"
+                    onClick={() => {
+                      setUserMenuOpen(false);
+                      onOpenPortfolioEarnings?.();
+                    }}
+                  >
+                    <CalendarIcon width="16" height="16" />
+                    <span>我的收益</span>
+                  </button>
                   <button
                     className="user-menu-item"
                     disabled={isSyncing}
@@ -177,18 +174,16 @@ export default function UserMenu({
                     <LoginIcon width="16" height="16" />
                     <span>登录</span>
                   </button>
-                  {!isMobile && (
-                    <button
-                      className="user-menu-item"
-                      onClick={() => {
-                        setUserMenuOpen(false);
-                        onOpenPortfolioEarnings?.();
-                      }}
-                    >
-                      <CalendarIcon width="16" height="16" />
-                      <span>我的收益</span>
-                    </button>
-                  )}
+                  <button
+                    className="user-menu-item"
+                    onClick={() => {
+                      setUserMenuOpen(false);
+                      onOpenPortfolioEarnings?.();
+                    }}
+                  >
+                    <CalendarIcon width="16" height="16" />
+                    <span>我的收益</span>
+                  </button>
                   <button
                     className="user-menu-item"
                     onClick={() => {

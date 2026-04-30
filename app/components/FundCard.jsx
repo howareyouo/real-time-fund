@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import timezone from 'dayjs/plugin/timezone';
@@ -12,8 +12,8 @@ import { Stat } from './Common';
 import FundTrendChart from './FundTrendChart';
 import FundIntradayChart from './FundIntradayChart';
 import FundDailyEarnings from './FundDailyEarnings';
+import FundHoldingsTable from './FundHoldingsTable';
 import {
-  ChevronIcon,
   SettingsIcon,
   StarIcon,
   SwitchIcon,
@@ -78,7 +78,6 @@ export default function FundCard({
   onToggleCollapse,
   onToggleTrendCollapse,
   onToggleEarningsCollapse,
-  layoutMode = 'card', // 'card' | 'drawer'，drawer 时前10重仓与业绩走势以 Tabs 展示
   masked = false,
   fundTags = [],
   onFundTagsClick,
@@ -127,22 +126,10 @@ export default function FundCard({
   const holdingLocked = (currentTab === 'all' || currentTab === 'fav') && isHoldingLinked;
   const holdingLinkedTitle = '持仓来自自定义分组汇总，点击选择分组后操作';
 
-  const style = layoutMode === 'drawer' ? {
-    border: 'none',
-    boxShadow: 'none',
-    paddingLeft: 0,
-    paddingRight: 0,
-    background: theme === 'light'  ? 'rgb(250,250,250)' : 'none',
-  } : {};
-
   return (
     <motion.div
       className="glass card"
-      style={{
-        position: 'relative',
-        zIndex: 1,
-        ...style,
-      }}
+      style={{position: 'relative', zIndex: 1}}
     >
       <div className="row" style={{ marginBottom: 10 }}>
         <div className="title">
@@ -550,189 +537,45 @@ export default function FundCard({
         );
       })()}
 
-      {layoutMode === 'drawer' ? (
-        <Tabs
-          defaultValue={hasHoldings ? 'holdings' : 'trend'}
-          className="w-full"
-        >
-          <TabsList
-            className={`w-full ${
-              hasHoldings && hasHoldingAmount
-                ? 'grid grid-cols-3'
-                : hasHoldings || hasHoldingAmount
-                  ? 'grid grid-cols-2'
-                  : ''
-            }`}
-          >
-            {hasHoldings && (
-              <TabsTrigger value="holdings">前10重仓股票</TabsTrigger>
-            )}
-            <TabsTrigger value="trend">业绩走势</TabsTrigger>
-            {hasHoldingAmount && (
-              <TabsTrigger value="earnings">我的收益</TabsTrigger>
-            )}
-          </TabsList>
+      <Tabs defaultValue='trend' className="w-full">
+        <TabsList
+          className={`w-full ${
+            hasHoldings && hasHoldingAmount
+              ? 'grid grid-cols-3'
+              : hasHoldings || hasHoldingAmount
+                ? 'grid grid-cols-2'
+                : ''
+          }`}>
+          <TabsTrigger value="trend">业绩走势</TabsTrigger>
           {hasHoldings && (
-            <TabsContent value="holdings" className="mt-3 outline-none">
-              <div
-                style={{
-                  display: 'flex',
-                  justifyContent: 'flex-end',
-                  marginBottom: 4,
-                }}
-              >
-                <span className="muted">涨跌幅 / 占比</span>
-              </div>
-              <div className="list">
-                {f.holdings.map((h, idx) => (
-                  <div className="item" key={idx}>
-                    <span className="name">{h.name}</span>
-                    <div className="values">
-                      {isNumber(h.change) && (
-                        <span
-                          className={`badge ${h.change > 0 ? 'up' : h.change < 0 ? 'down' : ''}`}
-                          style={{ marginRight: 8 }}
-                        >
-                          {h.change > 0 ? '+' : ''}
-                          {h.change.toFixed(2)}%
-                        </span>
-                      )}
-                      <span className="weight">{h.weight}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </TabsContent>
+            <TabsTrigger value="holdings">前10重仓股票</TabsTrigger>
           )}
           {hasHoldingAmount && (
-            <TabsContent value="earnings" className="mt-3 outline-none">
-              <FundDailyEarnings series={displayDailyEarningsSeries} theme={theme} masked={masked} />
-            </TabsContent>
+            <TabsTrigger value="earnings">我的收益</TabsTrigger>
           )}
-          <TabsContent value="trend" className="mt-3 outline-none">
-            <FundTrendChart
-              key={`${f.code}-${theme}`}
-              code={f.code}
-              isExpanded
-              onToggleExpand={() => onToggleTrendCollapse?.(f.code)}
-              // 未设置持仓金额时，不展示买入/卖出标记与标签
-              transactions={profit ? (transactions?.[f.code] || []) : []}
-              theme={theme}
-              hideHeader
-            />
+        </TabsList>
+        {hasHoldings && (
+          <TabsContent value="holdings" className="mt-3 outline-none">
+            <FundHoldingsTable holdings={f.holdings} />
           </TabsContent>
-        </Tabs>
-      ) : (
-        <>
-          {hasHoldings && (
-            <>
-              <div
-                style={{ marginBottom: 8, cursor: 'pointer', userSelect: 'none' }}
-                className="title"
-                onClick={() => onToggleCollapse?.(f.code)}
-              >
-                <div className="row" style={{ width: '100%', flex: 1 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <span>前10重仓股票</span>
-                    <ChevronIcon
-                      width="16"
-                      height="16"
-                      className="muted"
-                      style={{
-                        transform: collapsedCodes?.has(f.code)
-                          ? 'rotate(-90deg)'
-                          : 'rotate(0deg)',
-                        transition: 'transform 0.2s ease',
-                      }}
-                    />
-                  </div>
-                  <span className="muted">涨跌幅 / 占比</span>
-                </div>
-              </div>
-              <AnimatePresence>
-                {!collapsedCodes?.has(f.code) && (
-                  <motion.div
-                    initial={{ height: 0, opacity: 0 }}
-                    animate={{ height: 'auto', opacity: 1 }}
-                    exit={{ height: 0, opacity: 0 }}
-                    transition={{ duration: 0.3, ease: 'easeInOut' }}
-                    style={{ overflow: 'hidden' }}
-                  >
-                    <div className="list">
-                      {f.holdings.map((h, idx) => (
-                        <div className="item" key={idx}>
-                          <span className="name">{h.name}</span>
-                          <div className="values">
-                            {isNumber(h.change) && (
-                              <span
-                                className={`badge ${h.change > 0 ? 'up' : h.change < 0 ? 'down' : ''}`}
-                                style={{ marginRight: 8 }}
-                              >
-                                {h.change > 0 ? '+' : ''}
-                                {h.change.toFixed(2)}%
-                              </span>
-                            )}
-                            <span className="weight">{h.weight}</span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </>
-          )}
+        )}
+        {hasHoldingAmount && (
+          <TabsContent value="earnings" className="mt-3 outline-none">
+            <FundDailyEarnings series={displayDailyEarningsSeries} theme={theme} masked={masked} />
+          </TabsContent>
+        )}
+        <TabsContent value="trend" className="mt-3 outline-none">
           <FundTrendChart
             key={`${f.code}-${theme}`}
             code={f.code}
-            isExpanded={!collapsedTrends?.has(f.code)}
+            isExpanded
             onToggleExpand={() => onToggleTrendCollapse?.(f.code)}
             // 未设置持仓金额时，不展示买入/卖出标记与标签
             transactions={profit ? (transactions?.[f.code] || []) : []}
             theme={theme}
           />
-          {hasHoldingAmount && (
-            <>
-              <div
-                style={{ marginTop: 10, marginBottom: 8, cursor: 'pointer', userSelect: 'none' }}
-                className="title"
-                onClick={() => onToggleEarningsCollapse?.(f.code)}
-              >
-                <div className="row" style={{ width: '100%', flex: 1 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <span>我的收益</span>
-                    <ChevronIcon
-                      width="16"
-                      height="16"
-                      className="muted"
-                      style={{
-                        transform: !collapsedEarnings?.has(f.code) ? 'rotate(0deg)' : 'rotate(-90deg)',
-                        transition: 'transform 0.2s ease',
-                      }}
-                    />
-                  </div>
-                  <span className="muted" style={{ fontSize: 11 }}>
-                    {dailyEarningsSeries.length > 0 ? `共 ${dailyEarningsSeries.length} 天` : '未记录'}
-                  </span>
-                </div>
-              </div>
-              <AnimatePresence>
-                {!collapsedEarnings?.has(f.code) && (
-                  <motion.div
-                    initial={{ height: 0, opacity: 0 }}
-                    animate={{ height: 'auto', opacity: 1 }}
-                    exit={{ height: 0, opacity: 0 }}
-                    transition={{ duration: 0.3, ease: 'easeInOut' }}
-                    style={{ overflow: 'hidden' }}
-                  >
-                    <FundDailyEarnings series={displayDailyEarningsSeries} theme={theme} masked={masked} />
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </>
-          )}
-        </>
-      )}
+        </TabsContent>
+      </Tabs>
     </motion.div>
   );
 }
