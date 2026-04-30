@@ -3,19 +3,11 @@
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion, Reorder, useDragControls } from "framer-motion";
 import { createPortal } from "react-dom";
-import {
-  Drawer,
-  DrawerContent,
-  DrawerHeader,
-  DrawerTitle,
-  DrawerClose,
-} from "@/components/ui/drawer";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { CloseIcon, DragIcon, ResetIcon, SettingsIcon } from "./Icons";
 import ConfirmModal from "./ConfirmModal";
 
 function SortSettingReorderItem({
-  isMobile,
   item,
   editingId,
   editingAlias,
@@ -32,9 +24,7 @@ function SortSettingReorderItem({
     <Reorder.Item
       key={item.id}
       value={item}
-      className={
-        (isMobile ? "mobile-setting-item" : "pc-table-setting-item") + " glass"
-      }
+      className={"pc-table-setting-item glass"}
       layout
       initial={{ opacity: 0, scale: 0.98 }}
       animate={{ opacity: 1, scale: 1 }}
@@ -46,7 +36,7 @@ function SortSettingReorderItem({
         mass: 1,
         layout: { duration: 0.2 },
       }}
-      style={isMobile ? { touchAction: "pan-y" } : undefined}
+      style={undefined}
       dragListener={false}
       dragControls={dragControls}
       onDragStart={() => setIsReordering?.(true)}
@@ -145,32 +135,21 @@ function SortSettingReorderItem({
       {item.id !== "default" && (
         <button
           type="button"
-          className={isMobile ? "icon-button" : "icon-button pc-table-column-switch"}
+          className="icon-button pc-table-column-switch"
           onClick={(e) => {
             e.stopPropagation();
             handleToggle(item.id);
           }}
           title={item.enabled ? "关闭" : "开启"}
-          style={
-            isMobile
-              ? {
-                  border: "none",
-                  backgroundColor: "transparent",
-                  cursor: "pointer",
-                  flexShrink: 0,
-                  display: "flex",
-                  alignItems: "center",
-                }
-              : {
-                  border: "none",
-                  padding: "0 4px",
-                  backgroundColor: "transparent",
-                  cursor: "pointer",
-                  flexShrink: 0,
-                  display: "flex",
-                  alignItems: "center",
-                }
-          }
+          style={{
+              border: "none",
+              padding: "0 4px",
+              backgroundColor: "transparent",
+              cursor: "pointer",
+              flexShrink: 0,
+              display: "flex",
+              alignItems: "center",
+            }}
         >
           <span className={`dca-toggle-track ${item.enabled ? "enabled" : ""}`}>
             <span
@@ -185,22 +164,17 @@ function SortSettingReorderItem({
 }
 
 /**
- * 排序个性化设置弹框
- *
- * - 移动端：使用 Drawer（自底向上抽屉，参考市场指数设置）
- * - PC 端：使用右侧侧弹框（样式参考 PcTableSettingModal）
+ * 排序个性化设置弹框（PC 端使用右侧侧弹框）
  *
  * @param {Object} props
  * @param {boolean} props.open - 是否打开
  * @param {() => void} props.onClose - 关闭回调
- * @param {boolean} props.isMobile - 是否为移动端（由上层传入）
  * @param {Array<{id: string, label: string, enabled: boolean}>} props.rules - 排序规则列表
  * @param {(nextRules: Array<{id: string, label: string, enabled: boolean}>) => void} props.onChangeRules - 规则变更回调
  */
 export default function SortSettingModal({
   open,
   onClose,
-  isMobile,
   rules = [],
   onChangeRules,
   onResetRules,
@@ -288,11 +262,7 @@ export default function SortSettingModal({
 
   const body = (
     <div
-      className={
-        isMobile
-          ? "mobile-setting-body flex flex-1 flex-col overflow-y-auto"
-          : "pc-table-setting-body"
-      }
+      className="pc-table-setting-body"
     >
       <div
         style={{
@@ -415,10 +385,8 @@ export default function SortSettingModal({
           {/* 默认排序固定在顶部，且不可排序、不可关闭 */}
           {localRules.find((item) => item.id === "default") && (
             <div
-              className={
-                (isMobile ? "mobile-setting-item" : "pc-table-setting-item") +
-                " glass"
-              }
+              className={"pc-table-setting-item" +
+                " glass"}
               style={{
                 display: "flex",
                 alignItems: "center",
@@ -455,9 +423,7 @@ export default function SortSettingModal({
           axis="y"
           values={localRules.filter((item) => item.id !== "default")}
           onReorder={handleReorder}
-          className={isMobile ? "mobile-setting-list" : "pc-table-setting-list"}
-          layoutScroll={isMobile}
-          style={isMobile ? { touchAction: "pan-y" } : undefined}
+          className="pc-table-setting-list"
         >
           <AnimatePresence mode="popLayout">
             {localRules
@@ -465,7 +431,6 @@ export default function SortSettingModal({
               .map((item) => (
                 <SortSettingReorderItem
                   key={item.id}
-                  isMobile={isMobile}
                   item={item}
                   editingId={editingId}
                   editingAlias={editingAlias}
@@ -511,45 +476,6 @@ export default function SortSettingModal({
       )}
     </AnimatePresence>
   );
-
-  if (isMobile) {
-    return (
-      <Drawer
-        open={open}
-        onOpenChange={(v) => {
-          if (!v) onClose?.();
-        }}
-        direction="bottom"
-        handleOnly={isReordering}
-      >
-        <DrawerContent
-          className="glass"
-          defaultHeight="70vh"
-          minHeight="40vh"
-          maxHeight="90vh"
-        >
-          <DrawerHeader className="flex flex-row items-center justify-between gap-2 py-4">
-            <DrawerTitle className="flex items-center gap-2.5 text-left">
-              <SettingsIcon width="20" height="20" />
-              <span>排序个性化设置</span>
-            </DrawerTitle>
-            <DrawerClose
-              className="icon-button border-none bg-transparent p-1"
-              title="关闭"
-              style={{
-                borderColor: "transparent",
-                backgroundColor: "transparent",
-              }}
-            >
-              <CloseIcon width="20" height="20" />
-            </DrawerClose>
-          </DrawerHeader>
-          <div className="flex-1 overflow-y-auto">{body}</div>
-        </DrawerContent>
-        {resetConfirm}
-      </Drawer>
-    );
-  }
 
   if (typeof document === "undefined") return null;
 

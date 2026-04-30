@@ -3,38 +3,18 @@
 import ReactDOM from 'react-dom';
 import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { throttle } from 'lodash';
-import { AnimatePresence, motion } from 'framer-motion';
+import { AnimatePresence } from 'framer-motion';
 import { useWindowVirtualizer } from '@tanstack/react-virtual';
-import {
-  flexRender,
-  getCoreRowModel,
-  useReactTable,
-} from '@tanstack/react-table';
-import {
-  DndContext,
-  KeyboardSensor,
-  PointerSensor,
-  useSensor,
-  useSensors,
-  closestCenter,
-} from '@dnd-kit/core';
+import { flexRender, getCoreRowModel, useReactTable } from '@tanstack/react-table';
+import { DndContext, KeyboardSensor, PointerSensor, useSensor, useSensors, closestCenter } from '@dnd-kit/core';
 import { restrictToVerticalAxis, restrictToParentElement } from '@dnd-kit/modifiers';
-import {
-  SortableContext,
-  verticalListSortingStrategy,
-  useSortable,
-} from '@dnd-kit/sortable';
+import { SortableContext, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import ConfirmModal from './ConfirmModal';
 import FitText from './FitText';
 import PcTableSettingModal from './PcTableSettingModal';
 import FundCard from './FundCard';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { DragIcon, SettingsIcon, StarIcon, TrashIcon, ResetIcon, FolderPlusIcon, LinkIcon } from './Icons';
 import { fetchFundPeriodReturns, fetchRelatedSectors, fetchRelatedSectorLiveQuote } from '@/app/api/fund';
 import { storageStore } from '../stores';
@@ -129,7 +109,7 @@ function SortableRow({ row, children, isTableDragging, disabled, enableAnimation
   return (
     <SortableRowContext.Provider value={contextValue}>
       {enableAnimation ? (
-        <motion.div
+        <div
           ref={setNodeRef}
           className="table-row-wrapper"
           layout={isTableDragging ? undefined : "position"}
@@ -141,7 +121,7 @@ function SortableRow({ row, children, isTableDragging, disabled, enableAnimation
           {...attributes}
         >
           {children}
-        </motion.div>
+        </div>
       ) : (
         <div
           ref={setNodeRef}
@@ -233,7 +213,6 @@ export default function PcFundTable({
   const [showPortalHeader, setShowPortalHeader] = useState(false);
   const [effectiveStickyTop, setEffectiveStickyTop] = useState(stickyTop);
   const [portalHorizontal, setPortalHorizontal] = useState({ left: 0, right: 0 });
-  const enableRowAnimation = data.length <= 40;
 
   const handleDragStart = (event) => {
     setActiveId(event.active.id);
@@ -1028,8 +1007,7 @@ export default function PcFundTable({
             />
           );
         },
-        size: 300,
-        minSize: 140,
+        size: 140,
         enablePinning: true,
         cell: (info) => (
           <FundNameCell
@@ -1046,8 +1024,7 @@ export default function PcFundTable({
       {
         id: 'tags',
         header: '基金标签',
-        size: 168,
-        minSize: 96,
+        size: 96,
         cell: (info) => {
           const original = info.row.original || {};
           const list = Array.isArray(original.fundTags) ? original.fundTags : [];
@@ -1111,8 +1088,7 @@ export default function PcFundTable({
       {
         id: 'relatedSector',
         header: '关联板块',
-        size: 180,
-        minSize: 120,
+        size: 120,
         cell: (info) => {
           const original = info.row.original || {};
           const code = original.code;
@@ -1173,8 +1149,7 @@ export default function PcFundTable({
       {
         id: 'period1w',
         header: '近1周',
-        size: 88,
-        minSize: 72,
+        size: 72,
         cell: (info) => {
           const original = info.row.original || {};
           const code = original.code;
@@ -1196,8 +1171,7 @@ export default function PcFundTable({
       {
         id: 'period1m',
         header: '近1月',
-        size: 88,
-        minSize: 72,
+        size: 72,
         cell: (info) => {
           const original = info.row.original || {};
           const code = original.code;
@@ -1219,8 +1193,7 @@ export default function PcFundTable({
       {
         id: 'period3m',
         header: '近3月',
-        size: 88,
-        minSize: 72,
+        size: 72,
         cell: (info) => {
           const original = info.row.original || {};
           const code = original.code;
@@ -1242,8 +1215,7 @@ export default function PcFundTable({
       {
         id: 'period6m',
         header: '近6月',
-        size: 88,
-        minSize: 72,
+        size: 72,
         cell: (info) => {
           const original = info.row.original || {};
           const code = original.code;
@@ -1265,8 +1237,7 @@ export default function PcFundTable({
       {
         id: 'period1y',
         header: '近1年',
-        size: 88,
-        minSize: 72,
+        size: 72,
         cell: (info) => {
           const original = info.row.original || {};
           const code = original.code;
@@ -1288,8 +1259,7 @@ export default function PcFundTable({
       {
         accessorKey: 'latestNav',
         header: '最新净值',
-        size: 100,
-        minSize: 80,
+        size: 80,
         cell: (info) => {
           const original = info.row.original || {};
           const rawDate = original.latestNavDate ?? '-';
@@ -1313,8 +1283,7 @@ export default function PcFundTable({
       {
         accessorKey: 'estimateNav',
         header: '估算净值',
-        size: 100,
-        minSize: 80,
+        size: 80,
         cell: (info) => {
           const original = info.row.original || {};
           const rawDate = original.estimateNavDate ?? '-';
@@ -1342,8 +1311,7 @@ export default function PcFundTable({
       {
         accessorKey: 'yesterdayChangePercent',
         header: '最新涨幅',
-        size: 135,
-        minSize: 100,
+        size: 100,
         cell: (info) => {
           const original = info.row.original || {};
           const value = original.yesterdayChangeValue;
@@ -1369,8 +1337,7 @@ export default function PcFundTable({
       {
         accessorKey: 'estimateChangePercent',
         header: '估算涨幅',
-        size: 135,
-        minSize: 100,
+        size: 100,
         cell: (info) => {
           const original = info.row.original || {};
           const value = original.estimateChangeValue;
@@ -1401,8 +1368,7 @@ export default function PcFundTable({
       {
         accessorKey: 'sinceAddedChangePercent',
         header: '自添加来',
-        size: 135,
-        minSize: 100,
+        size: 100,
         cell: (info) => {
           const original = info.row.original || {};
           const value = original.sinceAddedChangeValue;
@@ -1432,8 +1398,7 @@ export default function PcFundTable({
       {
         accessorKey: 'totalChangePercent',
         header: '估算收益',
-        size: 135,
-        minSize: 100,
+        size: 100,
         cell: (info) => {
           const original = info.row.original || {};
           const value = original.estimateProfitValue;
@@ -1465,8 +1430,7 @@ export default function PcFundTable({
       {
         accessorKey: 'holdingAmount',
         header: '持仓金额',
-        size: 135,
-        minSize: 100,
+        size: 100,
         cell: (info) => {
           const original = info.row.original || {};
           const holdingLocked =
@@ -1553,8 +1517,7 @@ export default function PcFundTable({
       {
         accessorKey: 'holdingCost',
         header: '持仓成本',
-        size: 135,
-        minSize: 100,
+        size: 100,
         cell: (info) => {
           const original = info.row.original || {};
           if (original.holdingCostValue == null) {
@@ -1576,8 +1539,7 @@ export default function PcFundTable({
       {
         accessorKey: 'costNav',
         header: '成本净值',
-        size: 100,
-        minSize: 80,
+        size: 80,
         cell: (info) => {
           const original = info.row.original || {};
           if (original.costNavValue == null) {
@@ -1597,8 +1559,7 @@ export default function PcFundTable({
       {
         accessorKey: 'holdingDays',
         header: '持有天数',
-        size: 100,
-        minSize: 80,
+        size: 80,
         cell: (info) => {
           const original = info.row.original || {};
           const value = original.holdingDaysValue;
@@ -1619,8 +1580,7 @@ export default function PcFundTable({
       {
         accessorKey: 'todayProfit',
         header: '当日收益',
-        size: 135,
-        minSize: 100,
+        size: 100,
         cell: (info) => {
           const original = info.row.original || {};
           const value = original.todayProfitValue;
@@ -1652,8 +1612,7 @@ export default function PcFundTable({
       {
         accessorKey: 'yesterdayProfit',
         header: '昨日收益',
-        size: 135,
-        minSize: 100,
+        size: 100,
         cell: (info) => {
           const original = info.row.original || {};
           const value = original.yesterdayProfitValue;
@@ -1688,8 +1647,7 @@ export default function PcFundTable({
       {
         accessorKey: 'holdingProfit',
         header: '持有收益',
-        size: 135,
-        minSize: 100,
+        size: 100,
         cell: (info) => {
           const original = info.row.original || {};
           const value = original.holdingProfitValue;
@@ -1736,9 +1694,7 @@ export default function PcFundTable({
           </div>
         ),
         size: 80,
-        minSize: 80,
         maxSize: 80,
-        enableResizing: false,
         enablePinning: true,
         meta: {
           align: 'center',
@@ -2180,91 +2136,44 @@ export default function PcFundTable({
               items={data.map((item) => item.code)}
               strategy={verticalListSortingStrategy}
             >
-              {enableRowAnimation ? (
-                <AnimatePresence mode="popLayout">
-                  {tableRows.map((row, index) => (
-                    <SortableRow
-                      key={row.original.code || row.id}
-                      row={row}
-                      isTableDragging={!!activeId}
-                      disabled={sortBy !== 'default'}
-                      enableAnimation={!activeId}
-                    >
-                      <div
-                        className={`table-row table-row-scroll ${index % 2 === 1 ? 'row-even' : ''}`}
-                      >
-                        {row.getVisibleCells().map((cell) => {
-                          const columnId = cell.column.id || cell.column.columnDef?.accessorKey;
-                          const isNameColumn = columnId === 'fundName';
-                          const align = isNameColumn
-                            ? ''
-                            : NON_FROZEN_COLUMN_IDS.includes(columnId)
-                              ? 'text-right'
-                              : 'text-center';
-                          const cellClassName =
-                            (cell.column.columnDef.meta && cell.column.columnDef.meta.cellClassName) || '';
-                          const style = getCommonPinningStyles(cell.column, false);
-                          const isPinned = cell.column.getIsPinned();
-                          return (
-                            <div
-                              key={cell.id}
-                              className={`table-cell ${align} ${cellClassName} ${isPinned ? 'pinned-cell' : ''}`}
-                              style={style}
-                            >
-                              {flexRender(
-                                cell.column.columnDef.cell,
-                                cell.getContext(),
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </SortableRow>
-                  ))}
-                </AnimatePresence>
-              ) : (
-                <>
-                  {tableRows.map((row, index) => (
-                    <SortableRow
-                      key={row.original.code || row.id}
-                      row={row}
-                      isTableDragging={!!activeId}
-                      disabled={sortBy !== 'default'}
-                      enableAnimation={false}
-                    >
-                      <div
-                        className={`table-row table-row-scroll ${index % 2 === 1 ? 'row-even' : ''}`}
-                      >
-                        {row.getVisibleCells().map((cell) => {
-                          const columnId = cell.column.id || cell.column.columnDef?.accessorKey;
-                          const isNameColumn = columnId === 'fundName';
-                          const align = isNameColumn
-                            ? ''
-                            : NON_FROZEN_COLUMN_IDS.includes(columnId)
-                              ? 'text-right'
-                              : 'text-center';
-                          const cellClassName =
-                            (cell.column.columnDef.meta && cell.column.columnDef.meta.cellClassName) || '';
-                          const style = getCommonPinningStyles(cell.column, false);
-                          const isPinned = cell.column.getIsPinned();
-                          return (
-                            <div
-                              key={cell.id}
-                              className={`table-cell ${align} ${cellClassName} ${isPinned ? 'pinned-cell' : ''}`}
-                              style={style}
-                            >
-                              {flexRender(
-                                cell.column.columnDef.cell,
-                                cell.getContext(),
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </SortableRow>
-                  ))}
-                </>
-              )}
+              {tableRows.map((row, index) => (
+                <SortableRow
+                  key={row.original.code || row.id}
+                  row={row}
+                  isTableDragging={!!activeId}
+                  disabled={sortBy !== 'default'}
+                >
+                  <div
+                    className={`table-row table-row-scroll ${index % 2 === 1 ? 'row-even' : ''}`}
+                  >
+                    {row.getVisibleCells().map((cell) => {
+                      const columnId = cell.column.id || cell.column.columnDef?.accessorKey;
+                      const isNameColumn = columnId === 'fundName';
+                      const align = isNameColumn
+                        ? ''
+                        : NON_FROZEN_COLUMN_IDS.includes(columnId)
+                          ? 'text-right'
+                          : 'text-center';
+                      const cellClassName =
+                        (cell.column.columnDef.meta && cell.column.columnDef.meta.cellClassName) || '';
+                      const style = getCommonPinningStyles(cell.column, false);
+                      const isPinned = cell.column.getIsPinned();
+                      return (
+                        <div
+                          key={cell.id}
+                          className={`table-cell ${align} ${cellClassName} ${isPinned ? 'pinned-cell' : ''}`}
+                          style={style}
+                        >
+                          {flexRender(
+                            cell.column.columnDef.cell,
+                            cell.getContext(),
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </SortableRow>
+              ))}
             </SortableContext>
           </DndContext>
         )}
@@ -2394,13 +2303,11 @@ function FundDetailDialog({ blockDialogClose, cardDialogRow, getFundCardProps, s
         className="sm:max-w-2xl max-h-[88vh] flex flex-col p-0 overflow-hidden"
         onPointerDownOutside={blockDialogClose ? (e) => e.preventDefault() : undefined}
       >
-        <DialogHeader className="flex-shrink-0 flex flex-row items-center justify-between gap-2 space-y-0 px-6 pb-4 pt-6 text-left border-b border-[var(--border)]">
-          <DialogTitle className="text-base font-semibold text-[var(--text)]">
-            基金详情
-          </DialogTitle>
+        <DialogHeader className="sr-only">
+          <DialogTitle>基金详情</DialogTitle>
         </DialogHeader>
         <div
-          className="flex-1 min-h-0 overflow-y-auto px-6 py-4 scrollbar-y-styled"
+          className="flex-1 min-h-0 overflow-y-auto scrollbar-y-styled"
         >
           {cardDialogRow && getFundCardProps ? (
             <FundCard {...getFundCardProps(cardDialogRow)} layoutMode="drawer" />

@@ -82,7 +82,7 @@ function getChartThemeColors(theme) {
   return CHART_COLORS[theme] || CHART_COLORS.dark;
 }
 
-export default function FundTrendChart({ code, isExpanded, onToggleExpand, transactions = [], theme = 'dark', hideHeader = false }) {
+export default function FundTrendChart({ code, isExpanded, onToggleExpand, transactions = [], theme = 'dark' }) {
   const [range, setRange] = useState('3m');
   const chartRef = useRef(null);
   const hoverTimeoutRef = useRef(null);
@@ -200,7 +200,7 @@ export default function FundTrendChart({ code, isExpanded, onToggleExpand, trans
         pointRadius: 0,
         pointHoverRadius: 3,
         fill: false,
-        tension: 0.2,
+        tension: .1,
         order: 2,
       };
     });
@@ -224,7 +224,7 @@ export default function FundTrendChart({ code, isExpanded, onToggleExpand, trans
           pointRadius: 0,
           pointHoverRadius: 4,
           fill: true,
-          tension: 0.2,
+          tension: .1,
           order: 2
         },
         ...(['1y', '3y', 'all'].includes(range) ? [] : grandDatasets),
@@ -746,7 +746,7 @@ export default function FundTrendChart({ code, isExpanded, onToggleExpand, trans
           })}
       </div>
 
-      <div style={{ position: 'relative', height: 180, width: '100%', touchAction: 'pan-y' }}>
+      <div style={{ position: 'relative', height: 280, width: '100%', touchAction: 'pan-y' }}>
         {loading && (
           <div className="chart-overlay" style={{ backdropFilter: 'blur(2px)' }}>
             <span className="muted" style={{ fontSize: '12px' }}>加载中...</span>
@@ -782,39 +782,8 @@ export default function FundTrendChart({ code, isExpanded, onToggleExpand, trans
   );
 
   return (
-    <div style={{ marginTop: hideHeader ? 0 : 16 }} onClick={(e) => e.stopPropagation()}>
-      {!hideHeader && (
-        <div
-          style={{ marginBottom: 8, cursor: 'pointer', userSelect: 'none' }}
-          className="title"
-          onClick={onToggleExpand}
-        >
-          <div className="row" style={{ width: '100%', flex: 1 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span>业绩走势</span>
-              <ChevronIcon
-                width="16"
-                height="16"
-                className="muted"
-                style={{
-                  transform: !isExpanded ? 'rotate(-90deg)' : 'rotate(0deg)',
-                  transition: 'transform 0.2s ease'
-                }}
-              />
-            </div>
-            {data.length > 0 && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span className="muted">{ranges.find(r => r.value === range)?.label}涨跌幅</span>
-                <span style={{ color: lineColor, fontWeight: 600 }}>
-                  {change > 0 ? '+' : ''}{change.toFixed(2)}%
-                </span>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {hideHeader && data.length > 0 && (
+    <div onClick={(e) => e.stopPropagation()}>
+      {data.length > 0 && (
         <div className="row" style={{ marginBottom: 8, justifyContent: 'flex-end' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <span className="muted">{ranges.find(r => r.value === range)?.label}涨跌幅</span>
@@ -824,24 +793,7 @@ export default function FundTrendChart({ code, isExpanded, onToggleExpand, trans
           </div>
         </div>
       )}
-
-      {hideHeader ? (
-        chartBlock
-      ) : (
-        <AnimatePresence>
-          {isExpanded && (
-            <motion.div
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: 'auto', opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              transition={{ duration: 0.3, ease: 'easeInOut' }}
-              style={{ overflow: 'hidden' }}
-            >
-              {chartBlock}
-            </motion.div>
-          )}
-        </AnimatePresence>
-      )}
+      {chartBlock}
     </div>
   );
 }

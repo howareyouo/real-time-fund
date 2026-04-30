@@ -15,13 +15,6 @@ import {
   DialogContent,
   DialogTitle,
 } from '@/components/ui/dialog';
-import {
-  Drawer,
-  DrawerClose,
-  DrawerContent,
-  DrawerHeader,
-  DrawerTitle,
-} from '@/components/ui/drawer';
 
 function buildRows(history) {
   if (!Array.isArray(history) || history.length === 0) return [];
@@ -72,17 +65,7 @@ const columns = [
 
 export default function FundHistoryNetValueModal({ open, onOpenChange, code, theme }) {
   const [visibleCount, setVisibleCount] = useState(30);
-  const [isMobile, setIsMobile] = useState(false);
   const scrollRef = useRef(null);
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const mq = window.matchMedia('(max-width: 768px)');
-    const update = () => setIsMobile(mq.matches);
-    update();
-    mq.addEventListener('change', update);
-    return () => mq.removeEventListener('change', update);
-  }, []);
 
   useEffect(() => {
     if (!open) return;
@@ -252,38 +235,6 @@ export default function FundHistoryNetValueModal({ open, onOpenChange, code, the
   );
 
   if (!open) return null;
-
-  if (isMobile) {
-    return (
-      <Drawer open={open} onOpenChange={handleOpenChange} direction="bottom">
-        <DrawerContent
-          className="glass"
-          defaultHeight="70vh"
-          minHeight="40vh"
-          maxHeight="90vh"
-        >
-          <DrawerHeader className="flex flex-row items-center justify-between gap-2 py-3">
-            <DrawerTitle className="flex items-center gap-2.5 text-left">
-              <span>历史净值</span>
-            </DrawerTitle>
-            <DrawerClose
-              className="icon-button border-none bg-transparent p-1"
-              title="关闭"
-              style={{
-                borderColor: 'transparent',
-                backgroundColor: 'transparent',
-              }}
-            >
-              <CloseIcon width="20" height="20" />
-            </DrawerClose>
-          </DrawerHeader>
-          <div className="flex-1 px-4 pb-4">
-            {body}
-          </div>
-        </DrawerContent>
-      </Drawer>
-    );
-  }
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
