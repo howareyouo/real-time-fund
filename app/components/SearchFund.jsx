@@ -46,43 +46,9 @@ export default function SearchFund({
             disabled={disabled}
             className={showClear ? "pr-9" : undefined}
             ref={inputRef}
-            onBlur={() => {
-              // 移动端键盘收起时页面可能回弹，失焦后把输入框滚回可见区域
-              const el = inputRef.current
-              if (!el) return
-              // blur 之后通常还会发生一次 viewport resize/scroll 回弹，延迟滚动更可靠
-              setTimeout(() => {
-                requestAnimationFrame(() => {
-                  requestAnimationFrame(() => {
-                    try {
-                      el.scrollIntoView({
-                        block: "center",
-                        inline: "nearest",
-                        behavior: "smooth",
-                      })
-                    } catch { }
-
-                    // iOS/部分 WebView 可能忽略 scrollIntoView 的 smooth，这里做一次兜底
-                    try {
-                      const rect = el.getBoundingClientRect()
-                      const targetTop =
-                        window.scrollY +
-                        rect.top -
-                        (window.innerHeight / 2 - rect.height / 2)
-                      window.scrollTo({
-                        top: Math.max(0, targetTop),
-                        behavior: "smooth",
-                      })
-                    } catch { }
-                  })
-                })
-              }, 220)
-            }}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                e.preventDefault()
-                handleSearch()
-              }
+            onKeyUp={(e) => {
+              e.preventDefault()
+              handleSearch()
             }}
           />
           {showClear && (

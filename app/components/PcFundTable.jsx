@@ -1007,7 +1007,7 @@ export default function PcFundTable({
             />
           );
         },
-        size: 140,
+        size: 240,
         enablePinning: true,
         cell: (info) => (
           <FundNameCell
@@ -1755,7 +1755,6 @@ export default function PcFundTable({
     data,
     columns,
     enableColumnPinning: true,
-    enableColumnResizing: true,
     columnResizeMode: 'onChange',
     onColumnSizingChange: (updater) => {
       setColumnSizing((prev) => {
@@ -1931,15 +1930,6 @@ export default function PcFundTable({
                   </span>
                 )}
               </div>
-              {!forPortal && (
-                <div
-                  onMouseDown={header.column.getCanResize() ? header.getResizeHandler() : undefined}
-                  onTouchStart={header.column.getCanResize() ? header.getResizeHandler() : undefined}
-                  className={`resizer ${header.column.getIsResizing() ? 'isResizing' : ''
-                    } ${header.column.getCanResize() ? '' : 'disabled'}`}
-                  onClick={(e) => e.stopPropagation()}
-                />
-              )}
             </div>
           );
         })}

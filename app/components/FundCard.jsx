@@ -568,7 +568,6 @@ export default function FundCard({
           <FundTrendChart
             key={`${f.code}-${theme}`}
             code={f.code}
-            isExpanded
             onToggleExpand={() => onToggleTrendCollapse?.(f.code)}
             // 未设置持仓金额时，不展示买入/卖出标记与标签
             transactions={profit ? (transactions?.[f.code] || []) : []}

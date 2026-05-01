@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import {
   flexRender,
   getCoreRowModel,
@@ -73,6 +73,7 @@ export default function FundHistoryNetValue({ code, range = '1m', theme }) {
     queryFn: () => fetchFundHistory(code, range),
     enabled: Boolean(code),
     staleTime: 10 * 60 * 1000,
+    placeholderData: keepPreviousData,
   });
 
   const data = useMemo(() => buildRows(historyRaw || []), [historyRaw]);

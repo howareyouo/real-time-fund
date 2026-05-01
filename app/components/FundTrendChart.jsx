@@ -1,11 +1,8 @@
 "use client";
-
 import { useState, useEffect, useMemo, useRef } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import { fetchFundHistory } from "../api/fund";
 import * as qk from "../lib/query-keys";
-import { motion, AnimatePresence } from "framer-motion";
-import { ChevronIcon } from "./Icons";
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -84,7 +81,6 @@ function getChartThemeColors(theme) {
 
 export default function FundTrendChart({
   code,
-  isExpanded,
   onToggleExpand,
   transactions = [],
   theme = "dark",
@@ -102,15 +98,12 @@ export default function FundTrendChart({
 
   const chartColors = useMemo(() => getChartThemeColors(theme), [theme]);
 
-  const {
-    data: historyRaw,
-    isPending: loading,
-    isError,
-  } = useQuery({
+  const {data: historyRaw, isPending: loading, isFetching, isError} = useQuery({
     queryKey: qk.fundHistory(code, range),
     queryFn: () => fetchFundHistory(code, range),
-    enabled: Boolean(code) && isExpanded,
+    enabled: Boolean(code),
     staleTime: 10 * 60 * 1000,
+    placeholderData: keepPreviousData,
   });
 
   const data = historyRaw ?? EMPTY_FUND_HISTORY;
@@ -208,7 +201,7 @@ export default function FundTrendChart({
         pointRadius: 0,
         pointHoverRadius: 3,
         fill: false,
-        tension: 0.1,
+        tension: .1,
         order: 2,
       };
     });
@@ -232,7 +225,7 @@ export default function FundTrendChart({
           pointRadius: 0,
           pointHoverRadius: 4,
           fill: true,
-          tension: 0.1,
+          tension: .1,
           order: 2,
         },
         ...(["1y", "3y", "all"].includes(range) ? [] : grandDatasets),
@@ -659,9 +652,21 @@ export default function FundTrendChart({
   const currentIndex =
     activeIndex != null && activeIndex < data.length ? activeIndex : lastIndex;
 
-  const chartBlock = (
-    <>
-      {/* 顶部图示：说明不同颜色/标记代表的含义 */}
+  return (
+    <div onClick={(e) => e.stopPropagation()}>
+      {data.length > 0 && (
+        <div className="row" style={{ marginBottom: 8, justifyContent: "flex-end" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <span className="muted">
+              {ranges.find((r) => r.value === range)?.label}涨跌幅
+            </span>
+            <span style={{ color: lineColor, fontWeight: 600 }}>
+              {change > 0 ? "+" : ""}
+              {change.toFixed(2)}%
+            </span>
+          </div>
+        </div>
+      )}
       <div
         className="row"
         style={{
@@ -674,14 +679,14 @@ export default function FundTrendChart({
       >
         <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-            <span
-              style={{
-                width: 10,
-                height: 2,
-                borderRadius: 999,
-                backgroundColor: lineColor,
-              }}
-            />
+          <span
+            style={{
+              width: 10,
+              height: 2,
+              borderRadius: 999,
+              backgroundColor: lineColor,
+            }}
+          />
             <span className="muted">本基金</span>
           </div>
           {currentIndex != null &&
@@ -694,8 +699,8 @@ export default function FundTrendChart({
                   paddingLeft: 14,
                 }}
               >
-                {percentageData[currentIndex].toFixed(2)}%
-              </span>
+              {percentageData[currentIndex].toFixed(2)}%
+            </span>
             )}
         </div>
         {Array.isArray(data.grandTotalSeries) &&
@@ -777,20 +782,20 @@ export default function FundTrendChart({
                   <div
                     style={{ display: "flex", alignItems: "center", gap: 6 }}
                   >
-                    <span
-                      style={{
-                        width: 10,
-                        height: 2,
-                        borderRadius: 999,
-                        backgroundColor: isHidden ? "#4b5563" : color,
-                      }}
-                    />
+                  <span
+                    style={{
+                      width: 10,
+                      height: 2,
+                      borderRadius: 999,
+                      backgroundColor: isHidden ? "#4b5563" : color,
+                    }}
+                  />
                     <span
                       className="muted"
                       style={{ opacity: isHidden ? 0.5 : 1 }}
                     >
-                      {series.name}
-                    </span>
+                    {series.name}
+                  </span>
                     <button
                       className="muted"
                       type="button"
@@ -817,14 +822,7 @@ export default function FundTrendChart({
                           strokeWidth="1.6"
                         />
                         {isHidden && (
-                          <line
-                            x1="4"
-                            y1="20"
-                            x2="20"
-                            y2="4"
-                            stroke="currentColor"
-                            strokeWidth="1.6"
-                          />
+                          <line x1="4" y1="20" x2="20" y2="4" stroke="currentColor" strokeWidth="1.6"/>
                         )}
                       </svg>
                     </button>
@@ -840,8 +838,8 @@ export default function FundTrendChart({
                         isHidden || valueText === "--" ? "hidden" : "visible",
                     }}
                   >
-                    {valueText}
-                  </span>
+                  {valueText}
+                </span>
                 </div>
               );
             })}
@@ -860,27 +858,22 @@ export default function FundTrendChart({
             className="chart-overlay"
             style={{ backdropFilter: "blur(2px)" }}
           >
-            <span className="muted" style={{ fontSize: "12px" }}>
-              加载中...
-            </span>
+          <span className="muted" style={{ fontSize: "12px" }}>
+            加载中...
+          </span>
           </div>
         )}
 
         {!loading && (isError || data.length == 0) && (
           <div className="chart-overlay">
-            <span className="muted" style={{ fontSize: "12px" }}>
-              {isError ? "加载失败" : "暂无数据"}
-            </span>
+          <span className="muted" style={{ fontSize: "12px" }}>
+            {isError ? "加载失败" : "暂无数据"}
+          </span>
           </div>
         )}
 
         {data.length > 0 && (
-          <Line
-            ref={chartRef}
-            data={chartData}
-            options={options}
-            plugins={plugins}
-          />
+          <Line ref={chartRef} data={chartData} options={options} plugins={plugins}/>
         )}
       </div>
 
@@ -898,28 +891,6 @@ export default function FundTrendChart({
       </div>
 
       <FundHistoryNetValue code={code} range={range} theme={theme} />
-    </>
-  );
-
-  return (
-    <div onClick={(e) => e.stopPropagation()}>
-      {data.length > 0 && (
-        <div
-          className="row"
-          style={{ marginBottom: 8, justifyContent: "flex-end" }}
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <span className="muted">
-              {ranges.find((r) => r.value === range)?.label}涨跌幅
-            </span>
-            <span style={{ color: lineColor, fontWeight: 600 }}>
-              {change > 0 ? "+" : ""}
-              {change.toFixed(2)}%
-            </span>
-          </div>
-        </div>
-      )}
-      {chartBlock}
     </div>
   );
 }
